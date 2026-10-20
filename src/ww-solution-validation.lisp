@@ -482,7 +482,8 @@ it prints nothing and returns T."
 (defun apply-followups (state update)
   "Apply followup functions to state, modifying it in place.
    Followups are (function-name . args) pairs that modify state in-place."
-  (let ((state+ (copy-problem-state state)))
+  (let ((state+ (copy-problem-state state))
+        (*symmetry-visit-cell* (update.visit-cell update)))  ;the action's visit order
     (dolist (followup (update.followups update))
       (apply (car followup) state+ (cdr followup))
       (let ((updated-idb (problem-state.idb state+)))

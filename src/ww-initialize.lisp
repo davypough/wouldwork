@@ -14,6 +14,7 @@
 
 (defun init ()
   (reject-worker-read-write 'init)
+  (setf *symmetry-visit-active* nil)  ;no stale families from a prior problem during init actions
   (format t "~&Initializing...")
   (run-deferred-action-installers)  ;before *actions* is ordered; every technology is spliced by now
   (setf *query-names* (nreverse *query-names*))

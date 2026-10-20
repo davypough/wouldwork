@@ -761,7 +761,10 @@
                        :effect-lambda `(lambda (state ,@eff-args)
                                          ,(format nil "~A effect" name)
                                          (declare (ignorable ,@eff-args))
-                                         (let (updated-dbs 
+                                         (let ((*symmetry-visit-cell*  ;fixes this application's family visit order
+                                                 (make-action-symmetry-visit-cell
+                                                   state (when *symmetry-visit-active* (list ,@eff-args)) t))
+                                               updated-dbs 
                                                ,@(set-difference (set-difference eff-extra-$vars eff-args) eff-extra-?vars))
                                            (declare (ignorable ,@eff-extra-$vars))
                                            ,(translate effect 'pre)  ;start as pre, shift to eff in assert
@@ -784,16 +787,17 @@
   `(lambda (state &rest args)
      ,(format nil "~A precondition" name)
      (declare (ignorable state) (dynamic-extent args))
-     (destructuring-bind ,pre-param-?vars args
-       (let ,pre-$vars
-         (declare (ignorable ,@pre-$vars))
-         ,(if (eql (car precondition) 'let)
-            `(let ,(second precondition)
-               ,(third precondition)
-               (when ,(translate (fourth precondition) 'pre)
-                 ,(if eff-args `(list ,@eff-args) `t)))
-            `(when ,(translate precondition 'pre)
-               ,(if eff-args `(list ,@eff-args) `t)))))))
+     (let ((*symmetry-visit-cell* (make-action-symmetry-visit-cell state args nil)))  ;family visit order
+       (destructuring-bind ,pre-param-?vars args
+         (let ,pre-$vars
+           (declare (ignorable ,@pre-$vars))
+           ,(if (eql (car precondition) 'let)
+              `(let ,(second precondition)
+                 ,(third precondition)
+                 (when ,(translate (fourth precondition) 'pre)
+                   ,(if eff-args `(list ,@eff-args) `t)))
+              `(when ,(translate precondition 'pre)
+                 ,(if eff-args `(list ,@eff-args) `t))))))))
 
 
 (defun extract-effect-modified-relations (effect-form)

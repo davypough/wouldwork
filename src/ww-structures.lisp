@@ -20,7 +20,8 @@
   (fixed-idb-hash nil :type (or null fixnum))  ;incremental hash of propositions outside symmetry families
   (symmetry-idb nil :type (or null hash-table))  ;propositions that reference symmetry-family objects
   (canonical-symmetry-form :uncached :type (or list (eql :uncached)))  ;canonical form of symmetry-idb
-  (canonical-form-hash nil :type (or null fixnum)))  ;memoized hash of canonical-symmetry-form; cleared whenever the form is
+  (canonical-form-hash nil :type (or null fixnum))  ;memoized hash of canonical-symmetry-form; cleared whenever the form is
+  (symmetry-ranks nil :type (or null simple-vector)))  ;visit order won with canonical-symmetry-form (see SYMMETRY-MAPPING-RANKS); cleared with it
 ;Note: hidb is separate from idb because otherwise each exogenous event will change
 ;the state, leading to endless revisiting of the same similar state
 ;Note: happenings contains an entry for each object's next event, updated as events occur
@@ -114,7 +115,8 @@
     :symmetry-idb (when (problem-state.symmetry-idb state)
                     (copy-idb (problem-state.symmetry-idb state)))
     :canonical-symmetry-form :uncached
-    :canonical-form-hash nil))
+    :canonical-form-hash nil
+    :symmetry-ranks nil))
 
 
 (defun copy-problem-state (state)
@@ -155,7 +157,8 @@
         (problem-state.fixed-idb-hash state) nil
         (problem-state.symmetry-idb state) nil
         (problem-state.canonical-symmetry-form state) :uncached
-        (problem-state.canonical-form-hash state) nil)
+        (problem-state.canonical-form-hash state) nil
+        (problem-state.symmetry-ranks state) nil)
   state)
 
 
@@ -204,7 +207,20 @@
   (fixed-idb-hash nil :type (or null fixnum))  ;incremental fixed component in canonical mode
   (symmetry-idb nil :type (or null hash-table))  ;symmetric slice carried out of the effect
   (canonical-symmetry-form :uncached :type (or list (eql :uncached)))  ;parent's form, carried forward when the slice is untouched
-  (canonical-form-hash nil :type (or null fixnum)))  ;parent's memoized form-hash, carried forward alongside it
+  (canonical-form-hash nil :type (or null fixnum))  ;parent's memoized form-hash, carried forward alongside it
+  (symmetry-ranks nil :type (or null simple-vector))  ;parent's canonical visit order, carried forward alongside the form
+  (visit-cell nil))  ;the action's visit-order cell, rebound while its followups run
+
+
+(defstruct (symmetry-visit-cell (:conc-name symmetry-visit-cell.))
+  "Fixes the name-free visit order of family loops during one action application.
+   STATE is the state the action applies to; OBJECTS are the instantiation's family
+   objects, individualized under the local strategy; FORM is a symbolic snapshot of
+   STATE, taken before a backtracking effect mutates it; RANKS is filled on first use."
+  (state nil)
+  (objects nil :type list)
+  (form nil :type list)
+  (ranks nil :type (or null simple-vector)))
 
 
 (defstruct (solution (:conc-name solution.))

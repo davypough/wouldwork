@@ -359,7 +359,9 @@
                                    (update.canonical-symmetry-form updated-db)
                                    :uncached)
        :canonical-form-hash (when carry-hash-components-p
-                               (update.canonical-form-hash updated-db)))))
+                               (update.canonical-form-hash updated-db))
+       :symmetry-ranks (when carry-hash-components-p
+                         (update.symmetry-ranks updated-db)))))
 
 
 (defun get-wait-happenings (state)
@@ -394,12 +396,13 @@
          (*symmetry-idb-acc* (when canonical-p
                                (problem-state.symmetry-idb net-state)))
          (*symmetry-idb-touched-p* nil))
-    (dolist (followup (update.followups updated-db))
-      #+:ww-debug (when (>= *debug* 4)
-                    (ut::prt followup))
-      (apply (car followup) net-state (cdr followup))
-      #+:ww-debug (when (>= *debug* 4)
-                    (ut::prt (list-database (problem-state.idb net-state)))))
+    (let ((*symmetry-visit-cell* (update.visit-cell updated-db)))  ;the action's visit order
+      (dolist (followup (update.followups updated-db))
+        #+:ww-debug (when (>= *debug* 4)
+                      (ut::prt followup))
+        (apply (car followup) net-state (cdr followup))
+        #+:ww-debug (when (>= *debug* 4)
+                      (ut::prt (list-database (problem-state.idb net-state))))))
     (setf (problem-state.idb-hash net-state) *idb-hash-acc*
           (problem-state.fixed-idb-hash net-state) *fixed-idb-hash-acc*
           (problem-state.symmetry-idb net-state) *symmetry-idb-acc*)
@@ -408,7 +411,8 @@
     ;; followup (e.g. propagate-changes!) touched it.
     (when *symmetry-idb-touched-p*
       (setf (problem-state.canonical-symmetry-form net-state) :uncached
-            (problem-state.canonical-form-hash net-state) nil))
+            (problem-state.canonical-form-hash net-state) nil
+            (problem-state.symmetry-ranks net-state) nil))
     (validate-carried-hash net-state)  ;debug gate (no-op unless *validate-idb-hash*)
     net-state))
 

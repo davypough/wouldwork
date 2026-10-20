@@ -22,6 +22,7 @@
   (heuristic 0)   ; Cached score when choices are ordered
   parent-metadata ; Name, time, value, heuristic and arguments restored by undo
   followups       ; (fn . args) next & finally calls run after the forward update
+  visit-cell      ; The effect's SYMMETRY-VISIT-CELL, rebound while its followups run
   pre-applied-p)  ; T when effect already applied to *backtrack-state*
 
 
@@ -196,8 +197,9 @@
   "Run CHOICE's next & finally followup calls against *backtrack-state*.
    Writes are trailed by any active *bt-undo-frame*."
   (when (choice.followups choice)
-    (dolist (followup (choice.followups choice))
-      (apply (car followup) *backtrack-state* (cdr followup)))
+    (let ((*symmetry-visit-cell* (choice.visit-cell choice)))  ;the action's visit order
+      (dolist (followup (choice.followups choice))
+        (apply (car followup) *backtrack-state* (cdr followup))))
     (invalidate-problem-state-hash *backtrack-state*)))
 
 
@@ -475,6 +477,7 @@
                    :inverse-sig (and cycle-p (update-set-signature inverse))
                    :level level :value (update.value update)
                    :followups (update.followups update)
+                   :visit-cell (update.visit-cell update)
                    :pre-applied-p (and incremental-p single-p)))))
 
 (defun build-choices-bt (action updates pre-idb level)

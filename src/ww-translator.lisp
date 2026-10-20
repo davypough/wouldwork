@@ -467,8 +467,11 @@
         (multiple-value-bind (domain present-p) (gethash type *types*)
           (when present-p
             (values (first vars)
-                    (unless (or (null domain) (equal domain '(nil)))
-                      `',domain)
+                    (cond ((or (null domain) (equal domain '(nil)))
+                           nil)
+                          ((rest domain)  ;may range over a symmetry family
+                           `(symmetry-visit-domain ',domain ',type state))
+                          (t `',domain))
                     t)))))))
 
 
@@ -485,11 +488,12 @@
    state: a query domain from the quoted TYPE-INST, whose query arguments are passed as
    written, and a $variable domain from TYPE-INST rebuilt with each variable's value."
   (cond ((not dynamic)
-         `',static-collection)
+         `(symmetry-visit-collection ',type-inst ',static-collection state))
         ((some #'$varp (flatten-param-types type-inst))
          `(ut::transpose (eval-instantiated-spec ,(runtime-type-inst-form type-inst) state)))
         (t
-         `(ut::transpose (eval-instantiated-spec ',type-inst state)))))
+         `(ut::transpose (eval-instantiated-spec (symmetry-visit-type-inst ',type-inst state)
+                                                 state)))))
 
 
 (defun runtime-type-inst-form (type-inst)
@@ -987,6 +991,7 @@ predicates stay unknown because their argument may or may not be an instance."
                  (parent-hash (ensure-idb-hash state))
                  (parent-canonical-form (problem-state.canonical-symmetry-form state))
                  (parent-canonical-form-hash (problem-state.canonical-form-hash state))
+                 (parent-symmetry-ranks (problem-state.symmetry-ranks state))
                  (effect-state
                    (copy-problem-state-for-effect
                      state ,(and *happening-names* t))))
@@ -1014,6 +1019,10 @@ predicates stay unknown because their argument may or may not be an instance."
                                  :canonical-form-hash
                                    (when (and canonical-p (not *symmetry-idb-touched-p*))
                                      parent-canonical-form-hash)
+                                 :symmetry-ranks
+                                   (when (and canonical-p (not *symmetry-idb-touched-p*))
+                                     parent-symmetry-ranks)
+                                 :visit-cell *symmetry-visit-cell*
                                  :value ,(if *objective-value-p*
                                            '$objective-value
                                            0.0)
@@ -1045,6 +1054,7 @@ predicates stay unknown because their argument may or may not be an instance."
                                          0.0) 
                                :instantiations (list ,@*eff-param-vars*) 
                                :followups (nreverse followups)
+                               :visit-cell *symmetry-visit-cell*
                                ,@(when *has-sim-state*
                                    '(:sim-state $sim-state)))
                   updated-dbs)

@@ -259,10 +259,11 @@
             (setf (problem-state.fixed-idb-hash state) fixed-hash
                   (problem-state.symmetry-idb state) symmetry-idb)))
         (when (eq (problem-state.canonical-symmetry-form state) :uncached)
-          (setf (problem-state.canonical-symmetry-form state)
-                (build-canonical-idb-form
-                  (problem-state.symmetry-idb state))
-                (problem-state.canonical-form-hash state) nil))
+          (multiple-value-bind (form ranks)
+              (build-canonical-idb-form (problem-state.symmetry-idb state))
+            (setf (problem-state.canonical-symmetry-form state) form
+                  (problem-state.symmetry-ranks state) ranks
+                  (problem-state.canonical-form-hash state) nil)))
         (unless (problem-state.canonical-form-hash state)
           (setf (problem-state.canonical-form-hash state)
                 (ww-with-timing :symm/canon-hash
@@ -1133,7 +1134,8 @@ different acceptable milestone state."
 
 
 (defun build-canonical-idb-form (idb)
-  "Build the exact row-permutation canonical representation of IDB."
+  "Build the exact row-permutation canonical representation of IDB.
+   Second value: the visit order of the winning arrangement (see SYMMETRY-MAPPING-RANKS)."
   (declare (type hash-table idb))
   (ww-with-timing :symm/canon-form
     (build-exact-canonical-idb-form idb)))

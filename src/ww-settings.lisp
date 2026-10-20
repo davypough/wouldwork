@@ -1132,6 +1132,19 @@ treat their arguments as read-only and be safe to call concurrently."
    of rebuilt.")
 
 
+(sb-ext:defglobal *symmetry-visit-active* nil
+  "T while symmetry pruning is on with kept families, so spec loops over a family visit
+   its members in name-free canonical order.  Reset at the start of INIT, and set by
+   INITIALIZE-SYMMETRY-DETECTION once the families of the staged problem are known.")
+
+
+(defvar *symmetry-visit-cell* nil
+  "The visit-order cell of the action application in progress, bound by every action
+   precondition and effect and by the appliers of its followups: the parent state under
+   the global strategy, or a SYMMETRY-VISIT-CELL under the local strategy.  NIL outside
+   an action, where a family loop uses the canonical order of the state it evaluates.")
+
+
 (defvar *validate-idb-hash* nil
   "Debug gate. When T, every successor's incrementally-carried idb-hash is checked
    against a full compute-idb-hash rescan (validate-carried-hash); a mismatch signals

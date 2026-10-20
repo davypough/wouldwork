@@ -77,6 +77,17 @@
   "Dynamically bound cache of local row-transposition results.")
 
 
+(sb-ext:defglobal *symmetry-visit-domain-indices* (make-hash-table :test #'equal)
+  "Maps each type name, and the contents of each *types* instance list, to its visit-domain
+   index, or to NIL when it holds fewer than two family members.  Compiled code holds a
+   copy of a type's list, so a loop names its type to look it up by symbol.  Filled at
+   staging; read-only during search.")
+
+
+(sb-ext:defglobal *symmetry-visit-domain-count* 0
+  "Number of indexed visit domains.")
+
+
 (defmacro with-signature-element-string-cache (&body body)
   "Evaluate BODY with a fresh cache for signature-element->string."
   `(let ((*signature-element-string-cache* (make-hash-table :test #'eql)))
@@ -788,18 +799,23 @@
 
 
 (defun normalize-row-signature-tree
-    (tree family self-row-index family-indices)
-  "Replace symmetry objects in TREE with row-invariant family/role markers."
+    (tree family self-row-index family-indices individuals)
+  "Replace symmetry objects in TREE with row-invariant family/role markers.
+   An object in an individualized row (INDIVIDUALS) keeps its row's order instead."
   (cond
     ((consp tree)
      (cons (normalize-row-signature-tree
-             (car tree) family self-row-index family-indices)
+             (car tree) family self-row-index family-indices individuals)
            (normalize-row-signature-tree
-             (cdr tree) family self-row-index family-indices)))
+             (cdr tree) family self-row-index family-indices individuals)))
     (t
      (let ((membership (gethash tree *object-to-symmetry-membership*)))
        (cond
          ((null membership) tree)
+         ((and individuals (gethash tree individuals))
+          (list :individual
+                (gethash tree individuals)
+                (symmetry-membership.column-index membership)))
          ((eq family (symmetry-membership.family membership))
           (list (if (= self-row-index
                        (symmetry-membership.row-index membership))
@@ -813,25 +829,27 @@
 
 
 (defun compute-row-state-signature
-    (family row row-index annotated-form family-indices)
+    (family row row-index annotated-form family-indices individuals)
   "Return an invariant complete-incidence signature for one FAMILY row.
    ANNOTATED-FORM holds (proposition . symmetry-objects) entries."
   (sort
     (loop for (proposition . objects) in annotated-form
           when (some (lambda (object) (member object row :test #'eq)) objects)
             collect (normalize-row-signature-tree
-                      proposition family row-index family-indices))
+                      proposition family row-index family-indices individuals))
     #'ww-object<))
 
 
-(defun family-state-signature-cells (family state-form family-indices)
-  "Partition FAMILY rows by invariant state signatures and sort the cells."
+(defun family-state-signature-cells (family state-form family-indices individuals)
+  "Partition FAMILY's non-individualized rows by invariant state signatures and sort the cells."
   (let ((partitions (make-hash-table :test #'equal)))
     (loop for row in (symmetry-family.rows family)
           for row-index from 0
-          for signature = (compute-row-state-signature
-                            family row row-index state-form family-indices)
-          do (push row (gethash signature partitions)))
+          unless (and individuals (gethash (first row) individuals))
+            do (push row (gethash (compute-row-state-signature
+                                    family row row-index state-form family-indices
+                                    individuals)
+                                  partitions)))
     (sort
       (loop for signature being the hash-keys of partitions
               using (hash-value rows)
@@ -895,11 +913,19 @@
                     collect (append head-ordering tail-ordering)))))
 
 
-(defun family-canonical-row-orderings (family state-form family-indices)
-  "Return only the exact row orderings unresolved by invariant state signatures."
-  (combine-symmetry-cell-orderings
-    (family-state-signature-cells family state-form family-indices)
-    state-form))
+(defun family-canonical-row-orderings (family state-form family-indices individuals)
+  "Return only the exact row orderings unresolved by invariant state signatures.
+   Individualized rows (INDIVIDUALS) lead every ordering, in their own order."
+  (let ((individual-rows
+          (sort (loop for row in (symmetry-family.rows family)
+                      when (and individuals (gethash (first row) individuals))
+                        collect row)
+                #'< :key (lambda (row) (gethash (first row) individuals)))))
+    (mapcar (lambda (ordering)
+              (append individual-rows ordering))
+            (combine-symmetry-cell-orderings
+              (family-state-signature-cells family state-form family-indices individuals)
+              state-form))))
 
 
 (defun install-family-canonical-mapping
@@ -922,24 +948,26 @@
 
 
 (defun visit-symmetry-canonical-mappings
-    (function families family-index state-form family-indices mapping)
+    (function families family-index state-form family-indices mapping individuals)
   "Recursive worker for MAP-SYMMETRY-CANONICAL-MAPPINGS."
   (if (null families)
       (funcall function mapping)
       (let ((family (first families)))
         (dolist (ordering
                   (family-canonical-row-orderings
-                    family state-form family-indices))
+                    family state-form family-indices individuals))
           (install-family-canonical-mapping
             mapping family family-index ordering)
           (visit-symmetry-canonical-mappings
             function (rest families) (1+ family-index)
-            state-form family-indices mapping)
+            state-form family-indices mapping individuals)
           (clear-family-canonical-mapping mapping family)))))
 
 
-(defun map-symmetry-canonical-mappings (function state-form)
+(defun map-symmetry-canonical-mappings (function state-form individuals)
   "Call FUNCTION for every unresolved exact family-row ordering in STATE-FORM.
+   INDIVIDUALS, when non-NIL, maps each object of an individualized row to that row's
+   order; those rows lead their family's orderings and are never exchanged.
    Below this point the form travels annotated as (proposition . symmetry-objects)
    entries, so row-incidence tests scan each proposition's tree once per build."
   (let ((mapping (make-hash-table :test #'eq))
@@ -952,20 +980,211 @@
           for family-index from 0
           do (setf (gethash family family-indices) family-index))
     (visit-symmetry-canonical-mappings
-      function *symmetry-families* 0 annotated-form family-indices mapping)))
+      function *symmetry-families* 0 annotated-form family-indices mapping individuals)))
 
 
 (defun build-exact-canonical-idb-form (idb)
-  "Return the lexicographically least exact IDB form under all family permutations."
-  (let ((state-form (symbolic-idb-form idb))
-        (best nil))
+  "Return the lexicographically least exact IDB form under all family permutations.
+   Second value: the visit order of the winning arrangement (see SYMMETRY-MAPPING-RANKS)."
+  (canonical-symmetry-form-and-ranks (symbolic-idb-form idb) nil))
+
+
+(defun canonical-symmetry-form-and-ranks (state-form objects)
+  "Return the least renamed STATE-FORM over all unresolved family-row orderings, and the
+   visit order (see SYMMETRY-MAPPING-RANKS) of the arrangement that produced it.  The
+   rows of OBJECTS are individualized: they take the leading positions of their families,
+   in order.
+   Two winning arrangements differ by a symmetry of STATE-FORM, so either order serves."
+  (let ((best nil)
+        (best-ranks nil)
+        (individuals (when objects
+                       (symmetry-individual-indices objects))))
     (map-symmetry-canonical-mappings
       (lambda (mapping)
         (let ((candidate (renamed-symbolic-form state-form mapping)))
-          (when (or (null best) (ww-object< candidate best))
-            (setf best candidate))))
-      state-form)
-    best))
+          (when (or (null best-ranks) (ww-object< candidate best))
+            (setf best candidate
+                  best-ranks (symmetry-mapping-ranks mapping)))))
+      state-form individuals)
+    (values best best-ranks)))
+
+
+(defun symmetry-individual-indices (objects)
+  "Map every object in the family rows of OBJECTS to its row's order of first appearance."
+  (let ((individuals (make-hash-table :test #'eq))
+        (row-order 0))
+    (dolist (object objects)
+      (let ((membership (gethash object *object-to-symmetry-membership*)))
+        (when (and membership (not (gethash object individuals)))
+          (dolist (row-object (nth (symmetry-membership.row-index membership)
+                                   (symmetry-family.rows
+                                     (symmetry-membership.family membership))))
+            (setf (gethash row-object individuals) row-order))
+          (incf row-order))))
+    individuals))
+
+
+(defun symmetry-mapping-ranks (mapping)
+  "Return MAPPING's canonical visit order: a vector whose element 0 is an (object . rank)
+   alist, ranking objects by family, then canonical row position, then column, and whose
+   element I is the reordered I-th indexed visit domain, filled on first use."
+  (let ((ranks nil)
+        (order (make-array (1+ *symmetry-visit-domain-count*) :initial-element nil)))
+    (maphash (lambda (object marker)
+               (destructuring-bind (tag family-index row-position column-position) marker
+                 (declare (ignore tag))
+                 (push (cons object (+ (* family-index 1000000)
+                                       (* row-position 1000)
+                                       column-position))
+                       ranks)))
+             mapping)
+    (setf (svref order 0) ranks)
+    order))
+
+
+;;;; NAME-FREE VISIT ORDER ;;;;
+;;; Spec loops over a type that holds family members visit those members in canonical
+;;; order, never by name, so a "first found" choice picks the same physical object in
+;;; every renamed copy of a position.  During an action application the order is fixed
+;;; by its SYMMETRY-VISIT-CELL: the parent's canonical order under the global strategy
+;;; (every instantiation is still generated, so a tie only renames the set of children),
+;;; and under the local strategy the canonical order with the instantiation's own family
+;;; objects individualized (filtering drops an instantiation as a renaming of another,
+;;; which holds only if the order respects the action's objects).  Outside an action --
+;;; the goal and the hooks -- a loop uses the canonical order of the state it evaluates.
+
+
+(defun symmetry-visit-domain (domain key state)
+  "Return DOMAIN with its symmetry-family members in name-free canonical order.
+   The members fill the slots family members occupy in DOMAIN; other objects stay put.
+   KEY, DOMAIN's type name or DOMAIN itself, finds its index from staging, so a list
+   without two family members costs one lookup, and a reordered list is computed once
+   per visit order."
+  (if *symmetry-visit-active*
+      (let ((index (gethash key *symmetry-visit-domain-indices* :unindexed)))
+        (cond ((null index) domain)
+              ((eq index :unindexed)
+               (reorder-symmetry-domain domain (svref (symmetry-visit-order state) 0)))
+              (t (let ((order (symmetry-visit-order state)))
+                   (or (svref order index)  ;a racing duplicate fill stores the same list
+                       (setf (svref order index)
+                             (reorder-symmetry-domain domain (svref order 0))))))))
+      domain))
+
+
+(defun reorder-symmetry-domain (domain ranks)
+  "Return DOMAIN with the objects ranked in RANKS, an (object . rank) alist, sorted by rank
+   within the slots they occupy, or DOMAIN itself when fewer than two are ranked."
+  (let ((members (loop for object in domain
+                       when (assoc object ranks :test #'eq)
+                         collect object)))
+    (if (null (rest members))
+        domain
+        (let ((sorted (sort members #'<
+                            :key (lambda (object)
+                                   (cdr (assoc object ranks :test #'eq))))))
+          (mapcar (lambda (object)
+                    (if (assoc object ranks :test #'eq)
+                        (pop sorted)
+                        object))
+                  domain)))))
+
+
+(defun index-symmetry-visit-domains ()
+  "Number every distinct *types* instance list (by contents) holding two or more family
+   members, map every other instance list to NIL, and give each type name its list's
+   entry, for SYMMETRY-VISIT-DOMAIN."
+  (clrhash *symmetry-visit-domain-indices*)
+  (setf *symmetry-visit-domain-count* 0)
+  (maphash (lambda (type-name objects)
+             (when (listp objects)
+               (unless (nth-value 1 (gethash objects *symmetry-visit-domain-indices*))
+                 (setf (gethash objects *symmetry-visit-domain-indices*)
+                       (when (< 1 (count-if (lambda (object)
+                                              (gethash object *object-to-symmetry-membership*))
+                                            objects))
+                         (incf *symmetry-visit-domain-count*))))
+               (setf (gethash type-name *symmetry-visit-domain-indices*)
+                     (gethash objects *symmetry-visit-domain-indices*))))
+           *types*)
+  *symmetry-visit-domain-count*)
+
+
+(defun symmetry-visit-collection (type-inst static-collection state)
+  "Return a static quantifier's STATIC-COLLECTION, rebuilt from name-free ordered
+   instance lists when TYPE-INST ranges over two or more members of a family."
+  (let ((ordered (symmetry-visit-type-inst type-inst state)))
+    (if (eq ordered type-inst)
+        static-collection
+        (ut::transpose (eval-instantiated-spec ordered)))))
+
+
+(defun symmetry-visit-type-inst (type-inst state)
+  "Return instantiated TYPE-INST with each instance list in name-free order, or TYPE-INST
+   itself when no list ranges over two or more family members.  A dot-product keeps
+   name order, since it pairs its lists by position."
+  (if (or (not *symmetry-visit-active*)
+          (eql (first type-inst) 'dot-product))
+      type-inst
+      (let* ((changed nil)
+             (ordered
+               (mapcar (lambda (item)
+                         (let ((new-item
+                                 (cond ((atom item) item)
+                                       ((member (first item) *query-names*) item)
+                                       ((member (first item) *parameter-headers*)
+                                        (symmetry-visit-type-inst item state))
+                                       (t (symmetry-visit-domain item item state)))))
+                           (unless (eq new-item item)
+                             (setf changed t))
+                           new-item))
+                       type-inst)))
+        (if changed ordered type-inst))))
+
+
+(defun symmetry-visit-order (state)
+  "Return the visit order (see SYMMETRY-MAPPING-RANKS) governing family loops evaluated
+   in STATE.  Under the global strategy an action's cell is simply its parent state."
+  (let ((cell *symmetry-visit-cell*))
+    (cond ((problem-state-p cell)
+           (symmetry-state-ranks cell))
+          (cell
+           (or (symmetry-visit-cell.ranks cell)
+               (setf (symmetry-visit-cell.ranks cell)
+                     (nth-value 1 (canonical-symmetry-form-and-ranks
+                                    (or (symmetry-visit-cell.form cell)
+                                        (symbolic-idb-form
+                                          (problem-state.idb (symmetry-visit-cell.state cell))))
+                                    (symmetry-visit-cell.objects cell))))))
+          ((use-canonical-symmetry-p)
+           (symmetry-state-ranks state))
+          (t (nth-value 1 (canonical-symmetry-form-and-ranks
+                            (symbolic-idb-form (problem-state.idb state)) nil))))))
+
+
+(defun symmetry-state-ranks (state)
+  "Return complete STATE's canonical visit order under the global strategy, cached with
+   its canonical form.  STATE is never an effect's working copy: every effect binds a cell."
+  (ensure-idb-hash state)
+  (or (problem-state.symmetry-ranks state)
+      (setf (problem-state.symmetry-ranks state)
+            (nth-value 1 (build-canonical-idb-form (problem-state.symmetry-idb state))))))
+
+
+(defun make-action-symmetry-visit-cell (state instantiation effect-p)
+  "Return the visit-order cell for one action application in STATE, or NIL when visit
+   order is inactive.  The global strategy needs only the parent order, so its cell is
+   STATE itself.  The local strategy individualizes INSTANTIATION's family objects, and
+   a backtracking EFFECT-P mutates STATE in place, so its cell snapshots STATE first."
+  (cond ((not *symmetry-visit-active*) nil)
+        ((use-canonical-symmetry-p) state)
+        (t (make-symmetry-visit-cell
+             :state state
+             :objects (loop for object in instantiation
+                            when (gethash object *object-to-symmetry-membership*)
+                              collect object)
+             :form (when (and effect-p (eql *algorithm* 'backtracking))
+                     (symbolic-idb-form (problem-state.idb state)))))))
 
 
 ;;;; STATISTICS AND REPORTING ;;;;
@@ -1075,6 +1294,7 @@
   "Initialize symmetry detection if enabled. Must be called AFTER
    do-init-action-updates, so that exact transpositions see the static facts
    derived by init actions and not merely those authored in define-init."
+  (setf *symmetry-visit-active* nil)
   (when *symmetry-pruning*
     (detect-symmetry-groups)
     (when (and (boundp '*start-state*) *start-state*)
@@ -1102,7 +1322,9 @@
              (format t "  Strategy: Local — symmetric actions are detected at generation time and pruned.~%")))
        (terpri))
       (t
-       (format t "~2%No symmetry families detected. Set *symmetry-pruning* = nil for greater efficiency.~2%")))))
+       (format t "~2%No symmetry families detected. Set *symmetry-pruning* = nil for greater efficiency.~2%"))))
+  (index-symmetry-visit-domains)
+  (setf *symmetry-visit-active* (and *symmetry-pruning* *symmetry-families* t)))
 
 
 (defun refresh-symmetry-detection ()
@@ -1111,7 +1333,8 @@
       (initialize-symmetry-detection)
       (progn
         (setf *symmetry-groups* nil
-              *symmetry-families* nil)
+              *symmetry-families* nil
+              *symmetry-visit-active* nil)
         (clrhash *object-to-symmetry-group*)
         (clrhash *object-to-symmetry-membership*)
         (clrhash *symmetric-type-parameters*)))
