@@ -1,0 +1,164 @@
+FOX-GEESE PROBLEM ANALYSIS
+==========================
+
+PROBLEM / REVISION / SOURCES / AUTHORIZED SCOPE
+  Problem: fox-geese (user's name "fox&geese"; directory and spec name fox-geese agreed 2026-10-18).
+  Revision: 1, 2026-10-18 (problem-advisor consultation).
+  Sources: user's prose description and answers in the consultation. No existing spec.
+  Record: doc/problems/fox-geese/problem-analysis.txt
+  Scope: problem analysis only. Spec writing, engine changes, measurements and searches
+  are separately authorized.
+
+AGREED PROBLEM DESCRIPTION (agreed 2026-10-18)
+  - Board: square n x n checkerboard, n even or odd, up to 10 x 10. Play uses only the
+    squares of one color (black or red).
+  - Geese fill every playing-color square of their home row (row 1). Count G:
+    n even: n/2; n odd: (n+1)/2 on the corner color, (n-1)/2 on the other color.
+    8 x 8: 4 geese.
+  - The fox starts on a playing-color square of the opposite row (row n), and the fox
+    chooses which one as part of its strategy.
+  - Players alternate. A goose moves one square diagonally forward (toward row n), one goose
+    per turn. The fox moves one square diagonally forward or backward.
+  - No captures; two pieces never share a square.
+  - A side passes only when it has no legal move. If the geese cannot move, the fox moves
+    next. If the fox cannot move, it is trapped.
+  - Fox wins: the fox reaches row 1 (the geese's home row).
+  - Geese win: the fox is trapped (has no legal move on its turn).
+  - Objective: a proof, not play: determine whether either side has a guaranteed win, for
+    each board size/color variant and for both first movers (fox first, geese first).
+  Unresolved: none blocking. Note for spec: for odd n, name the color by whether it
+  includes the corner squares, since "black"/"red" alone is ambiguous there.
+
+USER OBJECTIVE AND ANSWER IDENTITY
+  Answer: for each variant (n, color, first mover), which side has a forced win.
+  The fox wins the variant if at least one starting square is a forced fox win.
+  The game value is a proof claim; the strategy that proves it is the certificate.
+  No draws exist (deduction D1), so exactly one side has a forced win in each variant.
+
+INTENDED RULES AND EXAMPLES
+  Allowed: goose diagonal step toward row n to an empty square; fox diagonal step in any
+    of four directions to an empty square; goose pass only when no goose can move.
+  Forbidden: captures/jumps; moving onto an occupied square; a goose moving backward or
+    sideways; passing while a legal move exists; the fox passing (no move = trapped).
+  Boundary: a goose on an edge column has one forward square; on row n it has none.
+
+CURRENT IMPLEMENTATION
+  None. No fox-geese spec exists.
+
+STRUCTURE AND GROWTH
+  - State: geese squares, fox square, side to move. History never affects legality.
+  - Goose moves are irreversible; total goose moves <= G(n-1) (8x8: 28; 10x10: 45).
+  - Fox moves are reversible, so positions can repeat only while the geese pass.
+  - Position counts (upper bounds, C(squares,G) x fox squares x 2):
+    8x8 about 2 million; 10x10 about 190 million; reachable sets are smaller.
+  - Game length bound (deduction D2): about 2(2G(n-1) + n) plies: 8x8 about 128,
+    10x10 about 200. The user sets the actual depth cutoff.
+
+JUSTIFIED DESIGN
+  R1 Rules model (agreed): state as above; actions fox-move, goose-move, goose-pass;
+     goal = fox on row 1; trap = fox to move with no legal move. Board size, color and
+     first mover are settings.
+     Superseded (2026-10-18): an extra rule "geese blocked only by geese/edge on their turn
+     => immediate fox win" was dropped; it is a proven consequence, not a user rule, and it
+     was needed only for loop control in a two-player solver. Kept as optional shortcut S2.
+  R2 Approach (agreed): strategy-check probes with the current architecture.
+     Wouldwork cannot search for a forced win (no two-player mode), but it can verify a
+     proposed strategy exhaustively:
+     - Geese check: geese reply chosen by a fixed rule applied right after each fox move;
+       the search branches only on fox moves (and start square). No fox win found under an
+       exhaustive search => the rule is a proven geese win. A found fox win is a
+       counterexample line for revising the rule.
+     - Fox check: fixed fox rule; branch only on goose moves; no trap found => proven fox
+       win (by D1).
+     Obligation: the fixed rule must choose exactly one move in every position, including
+     positions where its preferred pattern is impossible. Letting the search choose the
+     fixed side's move would make the check existential and prove nothing.
+     Alternative considered: a two-player (AND/OR) solving mode in the engine. Deferred by
+     the user; possible later work on adversarial games.
+  R3 Merging repeated positions (sound): the question is reachability of a fox win (or a
+     trap) for the free side, and a position's future does not depend on its route.
+  R4 Exhaustiveness: the game is finite (D1/D2), so a depth cutoff at the game length bound
+     makes the search exhaustive rather than bounded.
+  R5 Variants: start square and first mover are separate runs (or a first fox action that
+     chooses the start square). Even n: one color suffices (D3). Odd n: both colors.
+  R6 Size counting: an exhaustive enumeration of reachable positions measures growth
+     8x8 -> 10x10.
+
+WOULDWORK MAPPING (source-checked 2026-10-18 unless noted)
+  - Successor generation: B, ww-planner.lisp generate-children.
+  - Duplicate merging: B, ww-searcher.lisp *closed*, ensure-idb-hash (graph search).
+  - Goal and depth cutoff: B (advisor-reference F02, F19).
+  - Fixed opponent rule inside fox-move (or goose-move) effects: S.
+  - Rules, trap test, pass action: S.
+  - Two-player forced-win search: A, absent (grep of src for minimax/adversar/opponent/
+    and-or found nothing; happenings are scripted events, not an opponent). Deferred.
+
+INITIAL SETTINGS AND DEFERRED MEASUREMENTS
+  Semantic: graph search; depth cutoff at the game length bound; a geese check stops at the
+  first fox win (FIRST); a fox check looks for any trap.
+  Baseline: (ww-set *threads* 16), to be confirmed by the spec advisor against the
+  fixed-rule effects and graph-search parallel support.
+  Deferred: reachable-position counts and run times for 8x8 and 10x10 (search advisor).
+
+EVIDENCE
+  D1 (deduction) No draws. Goose moves <= G(n-1). If the geese pass at two consecutive
+     turns, the fox moved in between, so the fox did not cause the block; the geese are
+     stuck by geese/edge alone, permanently. Then every fox square has an empty diagonal
+     toward row 1 (a goose there would be stuck only if the fox's own square held a goose),
+     so the fox walks to row 1 untrappable. Holds for every n >= 2.
+  D2 (deduction) Length bound: goose turns <= G(n-1) moves + G(n-1)+1 passes before
+     permanent blocking + up to n-1 passes during the fox's final walk; fox turns similar.
+  D3 (deduction) Even n: a left-right mirror swaps square colors, so the red game is the
+     mirror image of the black game. Odd n: the mirror preserves color, so the two colors
+     are different games.
+  Capability gap: source search, 2026-10-18.
+
+OPEN ISSUES AND CAPABILITY GAPS
+  - Two-player solving mode (A): deferred by the user; not a blocker for the agreed scope.
+  - Exact depth cutoff per variant: the user supplies it (D2 gives the bound).
+
+VALIDATION PLAN
+  Fidelity examples for the spec advisor: edge-column goose has one move; goose on row n has
+  none; geese pass only when blocked; fox trapped in a corner by two geese; fox reaching
+  row 1 ends the game.
+  Strategy-check validation: on a small board (e.g. 4x4 or 5x5) a hand-checkable rule
+  should give a result that can be confirmed by hand.
+
+HINTS FOR DOWNSTREAM ADVISORS
+  - User hypothesis (unverified): the geese always win by keeping to a line until they can
+    guarantee cornering the fox.
+  - S1 optional shortcut (proven sound by D1's walk argument): the fox stands closer to row 1
+    than every goose => fox win.
+  - S2 optional shortcut (proven sound by D1): on the geese's turn, every goose blocked by
+    geese/edge alone => fox win.
+  - Mirror symmetry of the start position may halve the work (soundness to check for each
+    variant).
+  - Length bounds from D2.
+  - Later engine work: a two-player mode would need value propagation (some move wins / every
+    reply loses) with a result table; fox-geese is loop-free under S2, so plain memoized
+    depth-first evaluation suffices. Games with draws/repetition (e.g. checkers) need more.
+
+AGREEMENT AND HANDOFF
+  User confirmed: problem description, generalization to n x n up to 10x10 and both colors,
+  no-captures, pass rule, fox chooses start, both first movers, fox win = reaching row 1,
+  strategy-check approach, removal of the extra losing rule, name fox-geese.
+  Readiness: Analysis complete and ready for the spec advisor for the scope of strategy-check
+  probes and position counting. Excluded: finding the game value without a proposed strategy.
+  Spec obligations: faithful rules model (R1) plus a strategy-check variant (R2) whose fixed
+  rule is deterministic and total; settings for n, color, first mover; replayable paths.
+  Snapshot: doc/problems/fox-geese/problem-analysis-2026-10-18-before-spec.txt
+  Next step (needs authorization): spec advisor consultation.
+
+DIALOGUE EVALUATION
+  - Friction: the advisor and capability reference have no entry for two-player/proof
+    objectives ("guaranteed win"); the gap surfaced only by source search. Proposed advisor
+    improvement: add a reference entry on adversarial objectives and the strategy-check
+    technique. Approval pending.
+  - Friction: the advisor proposed a derived outcome as a rule (S2); the user questioned it.
+    Lesson: keep proven consequences out of the rules model and list them as shortcuts.
+
+CORRECTIONS
+  - 2026-10-18: Dropped "geese blocked by geese/edge => immediate fox win" from the rules
+    (now shortcut S2). Reopened: game length bound (raised by the fox's final walk).
+  - 2026-10-18: Engine augmentation path (two-player mode) replaced by strategy-check probes
+    at the user's direction; augmentation retained as deferred later work.

@@ -1,0 +1,403 @@
+FOX-GEESE SPECIFICATION ANALYSIS
+================================
+
+PROBLEM / REVISION / AUTHORIZED SCOPE
+  Record: doc/problems/fox-geese/spec-analysis.txt
+  Specification: probs/problem-fox-geese.lisp (basic model, both sides free), in progress.
+  Strategy-check variant: separate file named by extending the original
+    (e.g. problem-fox-geese-geese-check.lisp); name and fixed rule agreed after the
+    basic model is reviewed.
+  Approved 2026-10-18: drafting, staging, fidelity checks (validate-solution) and a
+    final bounded 8x8 run (threads 16, min-length, user-supplied depth cutoff), all
+    assistant-run in the Linux VM on the user's PC; pause for user review per section.
+  Source reading: advisor-reference entries as needed; existing grid specs for idioms
+    (captjohn-advisor read for naming and neighbor-list idioms).
+
+INPUT ANALYSIS AND OBJECTIVE
+  Current: doc/problems/fox-geese/problem-analysis.txt (revision 1, 2026-10-18).
+  Snapshot: doc/problems/fox-geese/problem-analysis-2026-10-18-before-spec.txt (until wrap-up).
+  Objective, answer identity, rules R1, approach R2, merging R3, exhaustiveness R4,
+    variants R5: as agreed there.
+  Fixed geese rule for the strategy check: not defined by the analysis; agreed
+    2026-10-18 to build the basic model first and design the rule with the user
+    afterward, checked on a 4x4 or 5x5 board.
+  Clarification agreed 2026-10-18: the playing color is named for every n by the color
+    of row 1, column 1. For odd n this equals "includes the corners"; for even n it
+    selects one of the two mirror-image games (D3).
+
+REPRESENTATION AND AUTHORING APPROACH
+  Path B, planning, graph search (R3).
+  Squares: only playing-color squares exist as objects, named RrCc (max 50 on 10x10).
+  Fox: (fox-at $square), one value; absent until the fox chooses its start (section 2).
+  Geese: named objects GOOSEc, c = starting column; (goose-at $goose $square :bijective).
+    Direct representation; interchangeability deferred to enhancements (symmetry pruning).
+  Turn: nullary (geese-to-move), true on the geese's turn (nullary dynamic relations
+    are supported: ww-installer.lisp signature for nullary relations; used in
+    test/engine/problem-engine-query-update-parameter-tests.lisp).
+  Not stored: square emptiness, trapped fox (computed when needed).
+  Settings (defparameter, edit and restage): *n* (3..10; lower limit set by user 2026-10-18), *plays-r1c1-color* (T/NIL),
+    *fox-first* (T/NIL).
+  Cost unit: every action costs 1 (one ply; a pass is a ply, as counted by D2).
+  Left to the REPL: *depth-cutoff*, *threads*, *solution-type* (run choices).
+  square-name helper kept (used in type generation and neighbor lists), as in
+    problem-captjohn-advisor.lisp.
+
+SECTION REVIEW AND REQUIREMENT MAPPING
+  1. Representation and settings: proposed, agreed and written 2026-10-18
+     (header, settings, define-types, define-dynamic-relations). Reviewed 2026-10-18;
+     user asked why named squares rather than a board array (answered; kept).
+  2. Board, pieces and starting position: proposed, agreed and written 2026-10-18.
+     Static: square-position> (row, col), fox-steps (4 diagonals on board),
+     goose-steps (forward diagonals; edge column 1, row n none), all set by init actions
+     from the settings (no hand-authored board facts). Geese start on row 1 via
+     initialize-geese; fox absent; turn unset.
+     User confirmed 2026-10-18: the fox chooses its start square before the first move,
+     also when the geese move first. Implemented in section 3 as a place-fox action
+     (first step of every game; sets the next turn from *fox-first*; costs 1 step, a
+     uniform offset that does not change which path is shortest).
+     Open for staging: init action asserting the dynamic goose-at facts (not declared
+     derived) -- confirm at first staging; whether define-init may be omitted.
+  3. Actions: proposed, agreed and written 2026-10-18 (all cost 1).
+     place-fox: fox absent; each row-n square; sets geese-to-move iff *fox-first* is NIL.
+     move-fox: fox's turn; each fox-steps neighbor with no goose; then geese' turn.
+       No legal move -> no successor (trap = dead end, geese win). Fox cannot pass.
+     move-goose: geese' turn, per goose; each goose-steps neighbor holding neither a
+       goose nor the fox; then fox's turn.
+     pass-geese: geese' turn and not geese-can-move?; then fox's turn. Kept separate
+       from move-goose (a combined action has no clean description for a pass); the
+       two-part target test is repeated in geese-can-move?.
+     Section 1 revisited: goose-at declared (goose-at $goose $square :bijective) so
+       square occupancy is one lookup; engine rejects two geese on one square.
+       Symmetry pruning compatibility with the bijective relation: confirmed 2026-10-18
+       (see enhancements).
+  4. Goal: proposed, agreed and written 2026-10-18: fox on a row-1 square (via
+     square-position>). Geese win has no goal: trapped fox = no successor.
+     A found path in this free version shows only that the fox can reach row 1 under
+     free play; forced-win claims belong to the strategy-check variant.
+     A duplicate define-goal (same code, different comment) was found at the end of
+     the file during staging (goal installed twice); the second copy was removed.
+  Basic-model review: pending (user).
+  Resolved at staging: an init action may assert the dynamic goose-at facts (not
+    declared derived); define-init may be omitted.
+
+ENHANCEMENTS FOR THE LARGER FAMILY (first view, each to be discussed)
+  - Geese interchangeable: symmetry pruning. IMPLEMENTED and enabled 2026-10-18
+    ((ww-set *symmetry-pruning* t) in the spec settings).
+    Growth issue: up to G! name permutations of the same goose arrangement (10x10: 120).
+    Correctness: geese obey identical rules, the goal names no goose, answer identity
+    (which side wins, path length) is independent of goose names; solutions still name
+    the actual geese.
+    Exercise (5x5, T, fox first, private copy, serial, min-length, cutoff 45):
+      engine reports family (GOOSE5 GOOSE3 GOOSE1), strategy Global (closed-list
+      canonical hashing); goal-referenced exclusion is the literal 1, not a goose.
+      Merge check: two positions reached by different move orders with GOOSE1/GOOSE3
+      swapped on R2C2/R3C3 give equal canonical forms; a different position does not.
+      So the bijective goose-at is compatible (open issue closed).
+      Search: 1,606 -> 1,482 states processed; minimum path 8 steps in both.
+    Requirement carried to the strategy-check variant: the fixed geese rule must choose
+      by squares, never by goose names (merged positions must share futures).
+    Deferred (search advisor): benefit on 8x8 and 10x10, and overhead per state.
+  - Static diagonal-neighbor lists per square (local choices): integrated in the basic
+    model (fox-steps, goose-steps); no separate enhancement. Agreed 2026-10-18.
+  - Shortcuts S1, S2 (earlier fox-win tests, sound per analysis D1): moved to the
+    strategy-check variant, where they end a proven fox win sooner; in the free model
+    they would only change what path length means. Agreed 2026-10-18.
+  - Mirror symmetry of the fox's start square: moved to the strategy-check variant.
+    Sound only for odd n (mirror keeps the playing color and the start position) and
+    only if the fixed rule treats left and right alike. Agreed 2026-10-18.
+  - Placeholder remaining-steps bound: IMPLEMENTED 2026-10-18 as min-steps-remaining?
+    = fox row - 1 once placed, n before placement. Sound: each step moves the fox at
+    most one row; reads stored facts only; pure function of the state.
+    Exercise (4x4, T, fox first, private copy, 16 threads, min-length), with vs
+    without the hook: start-state value 4; cutoff 33: 6 steps both (46 vs 232 states);
+    cutoff 6: 6 steps both (32 vs 59); cutoff 5: no solution both (30 vs 44). Answers
+    agree; the state counts show the hook ran.
+    Deferred (search advisor): a stronger bound (e.g. counting interleaved geese
+    turns) and its pruning value on larger boards.
+  - Strategy-check variant (R2): design agreed 2026-10-18; written and staged 2026-10-18
+    (status below the design).
+    File: probs/problem-fox-geese-geese-check.lisp (same board, pieces, settings;
+      no geese-to-move -- always the fox's turn).
+    Each fox move asserts the fox step and the rule's geese reply together; placement
+      includes the opening reply when the geese move first. Search branches only on
+      fox choices (start square, moves).
+    Draft geese rule (user: "looks good for a draft"), ranked, top move played:
+      1. Keep the line closed: drop moves after which the fox, geese frozen, could walk
+         to row 1, unless all moves do so.
+      2. Close in: fewest squares the fox can walk to.
+      3. Keep geese mobile: most geese with an open forward square.
+      4. Tie-break by squares: goose farthest from the fox's column, then farthest
+         behind (nearest row 1), then leftmost goose, then its leftmost target.
+      5. Pass if no goose can move.
+      Total and deterministic; chooses by squares only (symmetry-pruning compatible).
+    Implementation: one query returning the chosen move or pass, with a helper giving
+      the fox's walkable-square count and whether row 1 is reachable after a
+      hypothetical goose move.
+    Goal: fox win, extended with S1 and S2 (proven fox wins). A found solution is a
+      counterexample line; an exhaustive search with none proves the rule wins the
+      variant for every start square.
+    Settings: graph, FIRST, depth cutoff from D2 in combined steps. (Symmetry pruning
+      dropped 2026-10-19 with unnamed geese, below.)
+    Mirror start squares: left out (the leftmost tie-break is not mirror-equivariant).
+    Checks planned: rule-choice replays; 4x4 and 5x5 hand-checkable runs; 8x8 at the
+      user's cutoff.
+    Status 2026-10-18: file written (sections agreed one by one). Deviations from the
+      design: mobility count in its own query open-geese?; remaining-steps bound omitted
+      (S1/S2 can end a line sooner than fox row - 1, so the bound could cut a real
+      counterexample; stronger sound bound is a search-advisor question).
+    Staging (8x8, T, fox first, private copy): clean. Smoke check: start-position
+      reply GOOSE1 R1C1->R2C2 for every fox start (every other move frees a row-1
+      square the fox can reach); fox-walk? for that move = 26 squares, no row 1 (hand
+      count agrees).
+    Symmetry finding: staging reports no families. prune-inoperative-symmetry-groups
+      keeps a family only if some action parameter ranges over it; here only the rule
+      query iterates the geese. Searches stay sound, without merging renamed positions.
+      User's decision: engine change in a separate session (project doc
+      claude/symmetry-query-only-family-prompt.md), then resume here with pruning on.
+    Resolved 2026-10-19 (engine session): engine change abandoned and fully reverted.
+      Keeping a query-only family needs a check that every loop over the family is
+      independent of visit order; applied to all families, that check also exposed
+      never-checked loops in Talos code (no known wrong result), a much larger audit.
+      Instead the variant now uses unnamed geese: (goose-on square) replaces the named
+      geese and goose-at, so positions differing only in which goose is where are the
+      same state, with no symmetry family or pruning needed (*symmetry-pruning* NIL).
+      The rule, fox-walk?, open-geese? and goals S1/S2 range over goose squares; the
+      reply is (from-square to-square); the step label shows $goose-from $goose-to.
+      Scores unchanged (already by squares). Staging (8x8, T, fox first, private copy):
+      clean, no families; start reply R1C1->R2C2 for every fox start; fox-walk? for
+      that move = 26 squares, no row 1 (same as the named version).
+  Deferred to search advisor (agreed 2026-10-18): whether a packed geese bit-board
+    (geese interchangeable by construction) beats named geese + symmetry pruning.
+    Kept named squares/pieces: small positions (<= 6 facts), static neighbor lists
+    avoid computed-key bounds checks, advisor default (Section 2.3).
+    Update 2026-10-19: the strategy-check variant now has unnamed geese (above); the
+    question remains open for the base spec.
+
+CHECKS AND EVIDENCE
+  Environment: Linux VM on user's PC, SBCL 2.6.9, private copy of the checkout, fresh
+    process per check; board settings varied only in the copy. Operator: assistant.
+  Staging (8x8, T, fox first), 2026-10-18: completes; no warnings or errors from the
+    spec; goal installed once after the duplicate was removed. A compile-unit note
+    "Undefined variables: *ACTIONS* ..." appeared once in the first run while the
+    engine was freshly compiled (before the spec's forms were installed); it did not
+    recur on later stagings (blocks3 then fox-geese, fresh process). Engine-side.
+  Board facts (8x8, T): 32 squares; geese GOOSE1/3/5/7 on R1C1/3/5/7; edge-column
+    goose has one move (R2C8 -> R3C7; R7C1 -> R8C2); row-8 squares have no goose moves;
+    corner R8C8 fox move R7C7 only; R4C4 four fox moves, two goose moves. As expected.
+  Counts: 5x5 T: 13 squares, geese GOOSE1/3/5; 5x5 NIL: 12 squares, GOOSE2/4. As expected.
+  Replays (validate-solution; expected = observed for all):
+    3x3 fox first: goose onto the fox's square refused; pass legal when both geese
+      are blocked by the fox.
+    4x4 fox first: pass refused while one goose is blocked and another can move;
+      fox reaches R1C3 -> goal satisfied (6 actions); fox trapped in corner R4C4 by
+      a goose on R3C3 -> no successors at all (generate-children empty); trapped fox
+      move refused; pass refused on the fox's turn; goose move refused on the fox's
+      first turn; fox placement off row 4 refused; backward goose move refused.
+      Start offers exactly 2 placements; after fox R4C2->R3C1 the geese have exactly
+      3 moves.
+    4x4 geese first: goose moves right after placement; fox move then refused; pass
+      refused when geese can move.
+  Bounded run (4x4, T, fox first), 2026-10-18, user-chosen board: GRAPH, MIN-LENGTH,
+    *threads* 16 (VM has 2 cores), depth cutoff 33 (D2 bound 32 plies + placement).
+    Partitioned parallel search entered and completed without errors; 292 states,
+    71 repeats merged; minimum path 6 steps: place-fox R4C4, fox R3C3, GOOSE3 R2C2,
+    fox R2C4, GOOSE3 R3C1, fox R1C3. Shows the fox can reach row 1 under free play
+    (no forced-win claim). Performance not measured.
+  Not yet run: bounded 8x8 search (optional; needs user's depth cutoff).
+  Strategy-check variant, rule-choice replays, 2026-10-19 (unnamed-geese revision; VM,
+    SBCL 2.6.9, private copy; geese-reply?, fox-walk?, open-geese? called on states built
+    by validate-action-sequence or from listed facts; expected = hand ranking for all):
+    4x4 T fox first: fox R4C4->R3C3: R1C1->R2C2 (walk 4, no row 1) chosen over two
+      escaping moves. Geese R3C1, R4C4, fox R3C3: children R2C2 and R2C4 get the forced
+      reply R3C1->R4C2; R4C2 gets a pass (reply NIL, geese unchanged). Replay of
+      place-fox R4C4, move-fox R4C4->R3C3 gives geese R1C3, R2C2.
+    5x5 T fox first: fox R5C3->R4C2: R1C1->R2C2 and R1C5->R2C4 tie (walk 8, open 3);
+      part 4 (farther from the fox's column) picks R1C5->R2C4. Geese R2C2, R2C4, R1C5,
+      fox ->R4C4: all four moves escape; walks 9, 9, 8, 8; the two 8s split on open
+      geese 3 vs 2; R2C4->R3C3 chosen (parts 2 and 3).
+    5x5 T geese first: start children R5C1 -> reply R1C5->R2C4, R5C5 -> R1C1->R2C2,
+      R5C3 -> R1C1->R2C2 (parts 4, 5 tie; part 6 leftmost goose).
+  Strategy-check runs, 2026-10-19: GRAPH, MIN-LENGTH, *threads* 16 (VM 2 cores), cutoffs
+    from D2 in combined steps (user-approved). All completed without errors; each found
+    a fox win against the rule (a counterexample line):
+    4x4 T fox first, cutoff 17: 5 steps, 16 states. Place R4C4; R3C3 (R1C1->R2C2);
+      R4C2 (R1C3->R2C4, the only non-escaping move); R3C3 (R2C2->R3C1, forced);
+      R2C2 (R2C4->R3C3) -> S1. (A hand check claiming every geese alternative also
+      loses was wrong; see the game-value solver below and CORRECTIONS.)
+    5x5 T fox first, cutoff 30: 11 steps, 110 states. The geese seal row 2 (R2C2, R2C4)
+      at step 3, with R1C3 behind them unable to move. A goose must move whenever one
+      can (no pass), so the geese use up their spare moves (step 4 R2C4->R3C3 with
+      R1C3->R2C4 resealing at step 5, then R3C3->R4C2->R5C1) until a sealing goose must
+      leave row 2 (step 8, R2C2->R3C1); the fox walks in to R1C1. The rule does not
+      look ahead at how many spare moves remain.
+    5x5 NIL fox first, cutoff 22: 5 steps, 49 states. Two geese on a 5-wide board;
+      fox R5C4 -> R4C3 -> R3C4 -> R2C5 -> R1C4.
+    8x8 T fox first, cutoff 65 (user-run in the user's REPL, 16 threads, min-length):
+      completed normally; 9 steps, 1,224 states, 532 repeats pruned, max depth 21.
+      Fox R8C8 -> R7C7 -> R6C6 -> R5C5 -> R4C4 while the geese advance R1C1, R1C3,
+      R1C5, R1C7 in turn to row 2 (each move shrinks the fox's area). At step 6 all
+      four geese stand on row 2 with row 1 empty, so every later goose move leaves
+      row 2; after R2C8->R3C7 and R2C6->R3C5 (holes covered from behind), at step 8
+      every goose move lets the fox through (all moves escape), and R2C2->R3C1 lets
+      the fox in via R2C2 (S1 at step 9). Same pattern as 5x5 T: the rule seals the
+      line as early as possible, then runs out of moves that keep it sealed.
+    Not established: whether these boards are forced fox wins under any geese play;
+      the variant tests only this rule.
+  Rule revision 1, 2026-10-19 (user-approved): part 1 now looks one exchange ahead.
+    A move scores 0 if the fox, geese frozen, cannot walk to row 1 and, for every fox
+    step, the geese have a move (or a forced pass) after which it still cannot; 1 if
+    only the first holds; 2 if the fox can walk to row 1 at once. New query
+    line-holds?; helpers now take the geese squares as a list (goose-moves? new;
+    fox-walk?, open-geese? take the list after the move). Parts 2-7 unchanged.
+    Replays (same positions as above): all choices unchanged; line-holds? true for the
+      chosen non-escaping moves.
+    Runs (VM, same settings and cutoffs):
+      4x4 T fox first: same 5-step fox win, 16 states (consistent with a true fox win).
+      5x5 T fox first, cutoff 30: no solution, 69 states, max depth 9 (all lines end
+        well before the cutoff, so exhaustive): the revised rule wins 5x5 T with the
+        fox first, from every start square.
+      5x5 NIL fox first, cutoff 22: same 5-step fox win, 49 states (two geese).
+    8x8 T fox first, cutoff 65 (user's REPL, 16 threads, min-length): same 9-step fox
+      win as the draft rule, move for move; 1,216 states (draft 1,224), max depth 21.
+      Every reply on the line scored the same or the lookahead found no move that
+      holds. (An earlier reading, that the shortage of spare moves starts at steps 2-5,
+      was wrong; see the game-value solver below.)
+  Game-value solver, 2026-10-19 (user-approved; outside wouldwork, a throwaway Python
+    script in the VM, not in the project). Computes the true result of every position
+    under the agreed rules (no fox pass; geese pass only with no move; fox wins only
+    by reaching row 1; endless play counts as no fox win), by working from the most
+    advanced geese positions back. 8x8 T: 35,960 geese positions, about 3 s.
+    Results, fox first: 4x4 T geese win from every start square; 5x5 T geese win;
+      5x5 NIL fox wins from both start squares; 8x8 T geese win from every start.
+      Agrees with the wouldwork runs on 5x5 T (revised rule wins) and 5x5 NIL.
+    Line checks (where the rule's reply first turns a geese win into a loss):
+      4x4 line, step 3 (fox R4C2; geese R2C2, R1C3): rule R1C3->R2C4 loses; the only
+        winning move is R2C2->R3C3.
+      8x8 line: every rule reply through step 7 keeps the geese winning. Step 8 (fox
+        R3C3; geese R2C2, R2C4, R3C5, R3C7): rule R2C2->R3C1 loses; R3C5->R4C4 and
+        R3C7->R4C6 win.
+    Lesson: the frozen-geese walk is too pessimistic. Both winning moves leave a hole
+      the fox could walk through if the geese stood still, but the geese close it in
+      time. Part 1 counts such moves as escapes and ranks them with truly losing ones.
+  Rule revision 2, 2026-10-19 (user-approved): the one-exchange check applies to every
+    move, including moves that leave a hole; a fox step onto row 1 fails it. Part 1:
+    0 if the check holds, 1 if not but the fox cannot walk to row 1 now, 2 otherwise.
+    Audit (VM): every geese decision the rule makes in the variant's reachable
+    positions (all fox choices, via generate-children) was checked against the solver
+    for a reply that turns a geese win into a loss while a winning reply exists:
+      4x4 T: 7 decisions, 0 errors. 5x5 T: 49 decisions, 0 errors. With the solver's
+        geese-win start values, the rule wins both boards from every start square.
+      8x8 T: 1,587 decisions (1,272 in positions already lost), 15 errors. The run
+        (cutoff 65) still finds the same 9-step fox win, 937 states; at step 8 the
+        winning replies R3C5->R4C4 and R3C7->R4C6 need more than one exchange to show
+        that their hole closes. Other errors: geese far behind (R5C1, R6C2) while the
+        fox is far away, e.g. geese R4C2, R4C4, R4C6, R6C2, fox to R7C5: rule
+        R4C4->R5C3 loses, only R4C4->R5C5 wins.
+  Lookahead depth test, 2026-10-19 (user-approved; throwaway Python copy of the rule
+    with a lookahead of k exchanges, outside the project). The copy at k = 1 matches
+    wouldwork's reply on all 3,487 recorded 8x8 decisions. Audit over all fox choices
+    (the copy also explores past S1/S2, so counts exceed the wouldwork audit), 8x8 T:
+      losing replies k=1: 21, k=2: 12, k=3: 12, k=4: 17, k=5: 14, k=6: 10.
+    Deeper lookahead does not converge to zero. Typical remaining error: several moves
+    pass the lookahead and the tie-breaks pick a losing one, e.g. geese R3C3, R3C5,
+    R3C7, R4C2, fox to R4C4: rule R4C2->R5C1 (edge goose falls behind), only
+    R3C7->R4C6 wins. Lookahead is not the fix; the ranking needs a different idea.
+  Winning-formation analysis, 2026-10-19 (user-approved; throwaway Python solver,
+    outside the project). 8x8 T, fox first; positions reached with the geese playing
+    winning moves against every fox choice, plus re-solves with geese moves restricted:
+    - Four geese on one row, geese to move: geese win from every fox square in front,
+      rows 1-7. Near the fox, the winning moves use a goose not next to the fox,
+      stepping toward the fox's column (line R4C2,R4C4,R4C6,R4C8, fox R5C3: only
+      R4C6->R5C5, R4C8->R5C7); the edge step R4C2->R5C1 loses with the fox within
+      about two rows.
+    - Geese still win if all four always stay within 3 rows; they lose if held within 2.
+    - Geese lose if no goose move may leave the fox a frozen walk to row 1: holes are
+      necessary. Earliest: geese R2C2,R2C4,R2C6,R3C7, fox R3C5: only R2C2->R3C3 wins
+      (frozen walk 6 steps).
+    - The fox's frozen walk length after a move predicts the result: 2-3 steps always
+      lose, 11+ always win, closed lines win 3,952 : 18.
+    - Recurring winning pattern: the geese close a pocket around the fox and leave the
+      hole on the far side (geese R4C2,R4C4,R4C6,R5C7, fox R5C5: only R4C2->R5C3).
+    Online search (2026-10-19): no published geese rule without lookahead. Winning Ways
+      (2nd ed., corrected by Berlekamp) values the game exactly with combinatorial-game
+      values (a count of spare moves); gilith.com's computer solution gives only the
+      "FoxBox" heuristic (keep the fox contained), stated as necessary, not sufficient.
+  Rule revision 3, 2026-10-19 (user-approved): each goose move is scored by the fox's
+    frozen walk to row 1 after *lookahead* exchanges (fox shortens it, geese lengthen
+    it; -1 fox reaches row 1, 99 no walk, 999 fox trapped), longest first; then the
+    frozen walk now, longest first; then goose nearest row 1, leftmost goose, leftmost
+    target. New queries walk-value?, fox-distance?; removed line-holds?, fox-walk?,
+    open-geese?. New setting *lookahead* (4).
+    Python check of the ranking (copy of the rule against the solver, every fox choice):
+      lookahead 3 without the walk-now part: 1 losing 8x8 reply (most tie orders);
+      lookahead 4 with it: 0 under all five tie orders tried; 0 on 4x4 T and 5x5 T.
+      (An earlier check started every line with the geese to move, i.e. the geese-first
+      game, and wrongly showed 0 at lookahead 3; see CORRECTIONS.)
+    Wouldwork at lookahead 3 without the walk-now part (VM): chose as the Python copy on
+      all 1,252 recorded 8x8 decisions and made its 1 losing reply (geese R2C2,R2C4,
+      R3C7,R4C4, fox ->R4C2: R2C4->R3C3; only R3C7->R4C6 wins). Both moves score 6
+      after 3 exchanges; the walk now is 7 vs 9.
+    Wouldwork at lookahead 4 (cloud container, SBCL 2.2.9, serial), audit over every
+      fox choice via generate-children, checked with the solver:
+      4x4 T: 7 decisions, 0 losing. 5x5 T: 33 decisions, 0 losing.
+      8x8 T: 667 decisions (1,067 lines, 490 states, 2,120 s), 0 losing, none in a lost
+        position; chooses as the Python copy on every line. With the solver's
+        geese-win start values, the rule wins 8x8 T fox first from every start square.
+      Searches (GRAPH, MIN-LENGTH, serial): 4x4 T cutoff 17: no solution, 12 states,
+        max depth 5. 5x5 T cutoff 30: no solution, 52 states, max depth 9.
+      8x8 T fox first, cutoff 65 (user's REPL, 16 threads requested, min-length): no
+        solution, completed normally; max depth 25, 491 program cycles, 1,072 states
+        processed, 581 repeats pruned, 1,289 s. Task generation expanded the whole
+        search serially (99.9% CPU of one core), so the time is the serial cost.
+        Exhaustive (max depth far below the cutoff): rule revision 3 is a proven geese
+        win on 8x8 T fox first, from every start square.
+    Geese first (*fox-first* NIL), 2026-10-19 (user-approved). Solver values, geese
+      first: 4x4 T, 5x5 T, 6x6 T, 8x8 T geese win from every fox start square; 5x5 NIL
+      fox wins. Python copy of the rule, every fox choice: 0 losing replies on 4x4 T
+      (7 decisions), 5x5 T (29), 6x6 T (84), 8x8 T (642).
+      Wouldwork audit (cloud container, SBCL 2.2.9, serial), checked with the solver:
+        4x4 T 7 decisions, 5x5 T 29, 8x8 T 642 (1,028 lines, 459 states, 1,981 s);
+        0 losing replies, none in a lost position.
+      Searches (GRAPH, MIN-LENGTH): 4x4 T cutoff 17: no solution, 10 states, max
+        depth 4. 5x5 T cutoff 30: no solution, 39 states, max depth 9. 8x8 T cutoff 65
+        (user's REPL, serial): no solution, completed normally; max depth 24, 460
+        program cycles, 1,029 states processed, 569 repeats pruned, 890 s.
+      All exhaustive: rule revision 3 is a proven geese win geese first on 4x4 T, 5x5 T
+        and 8x8 T, from every fox start square.
+
+READINESS AND OPEN ISSUES
+  Basic model (problem-fox-geese.lisp): all four sections written; staging clean;
+    fidelity replays pass; symmetry pruning and placeholder bound exercised; bounded
+    run done on 4x4 at the user's choice (8x8 bounded run not yet run). Awaiting the
+    strategy-check variant before final review, acceptance and handoff (Step 5).
+  Strategy-check variant: unnamed geese; staging clean; rule-choice replays pass.
+    Draft rule lost 4x4 T, 5x5 T, 5x5 NIL and 8x8 T; rule revision 1 (one-exchange
+    lookahead) wins 5x5 T fox first exhaustively but loses 8x8 T on the same line
+    (CHECKS). Revision 2 (one-exchange check for every move) wins 4x4 T and 5x5 T
+    but makes 15 losing choices on 8x8 T. Revision 3 (frozen walk length after 4
+    exchanges, then walk now) makes no losing choice on 4x4 T, 5x5 T or 8x8 T fox
+    first (wouldwork audit checked with the solver); the 8x8 T search confirms it
+    (no fox win, exhaustive). Geese first also proven on 4x4 T, 5x5 T and 8x8 T.
+    5x5 NIL is a fox win either way (solver). Open: other sizes and colors (3x3,
+    6x6 fox first, 7x7, 9x9, 10x10; NIL for odd n) not checked; lookahead 4 costs
+    15-20 min serially on 8x8. No lookahead-free geese rule found (online search
+    and solver re-solves; some simple families proven to lose), not proven impossible.
+
+HANDOFF AND NEXT STEP
+  Next: decide which further variants to check with rule revision 3.
+    Done 2026-10-19: winning-formation analysis and rule revision 3; continuation
+    prompt for that work: project doc
+    claude/fox-geese-winning-formations-continuation-prompt.md (includes the solver
+    source; the VM copy is lost with the session).
+    Earlier continuation prompt (implementation, done):
+    project doc claude/fox-geese-geese-check-continuation-prompt.md.
+
+CORRECTIONS AND HISTORY
+  2026-10-19: the 4x4 counterexample was first recorded as "looks like a true fox
+    win" from a hand check using the frozen-geese walk; the solver shows 4x4 T is a
+    geese win and the rule's step-3 reply is the losing move. The 8x8 note blaming
+    steps 2-5 was likewise wrong (the geese were still winning through step 7).
+  2026-10-19: rule revision 3 was first checked in Python with every line starting with
+    the geese to move (the geese-first game); it showed 0 losing replies at lookahead 3.
+    Wouldwork's fox-first audit found 1; the corrected check agrees, and lookahead 4
+    with the walk-now tie-break was adopted.
