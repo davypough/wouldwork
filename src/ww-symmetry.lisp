@@ -695,6 +695,48 @@
     (t nil)))
 
 
+;;;; ENGINE STATE SNAPSHOTS ;;;;
+;;; Content-based views of a position, for plain Lisp that keys a cache on it.  A snapshot
+;;; holds facts, not object order, so a renamed position yields a renamed snapshot and gets
+;;; its own correctly computed entry: caching on one is sound under symmetry pruning.  These
+;;; are the only engine functions the safety flow check lets receive the position
+;;; (*FLOW-ENGINE-STATE-READERS*).
+
+
+(defparameter *state-projection-relations*
+  (make-hash-table :test #'eql :synchronized t)
+  "Maps an idb storage key to its relation's name, resolved through *BIJECTIVE-CANONICAL*.
+   Decoding a key costs a CONVERT-TO-PROPOSITION, so it is done once per distinct key.
+   DEFPARAMETER so it empties on every stage, which reloads the system and renumbers keys.")
+
+
+(defun state-relations-projection (state relations)
+  "STATE's idb entries whose relation is in RELATIONS, as (key . value) pairs sorted by
+   key, so EQUAL compares two projections by content.  Each pair carries the stored value,
+   not just presence, so a fluent relation discriminates correctly."
+  (let ((projection nil))
+    (maphash (lambda (key value)
+               (when (member (state-projection-relation key) relations :test #'eq)
+                 (push (cons key value) projection)))
+             (problem-state.idb state))
+    (sort projection #'< :key #'car)))
+
+
+(defun state-projection-relation (key)
+  "The name of the relation stored under idb KEY.  A bijective relation is stored under its
+   two generated index names, which resolve back to its own name -- HOLDING is stored as
+   HOLDING1 and HOLDING2."
+  (multiple-value-bind (name present) (gethash key *state-projection-relations*)
+    (if present
+      name
+      (setf (gethash key *state-projection-relations*)
+            (let ((name (first (convert-to-proposition key))))
+              (or (car (gethash name *bijective-canonical*)) name))))))
+
+
+(register-worker-read-memo '*state-projection-relations* :empty-table)
+
+
 ;;;; SAFETY FLOW CHECK ;;;;
 ;;; Follows every family's members through the code the search runs: action parameters,
 ;;; preconditions and effects, query and update bodies (interprocedurally), the goal, the
@@ -739,7 +781,7 @@
   "Name-free operators that apply a function argument to list elements.")
 
 
-(defparameter *flow-engine-state-readers* nil
+(defparameter *flow-engine-state-readers* '(state-relations-projection)
   "Engine functions allowed to receive the position: content-based snapshots.")
 
 

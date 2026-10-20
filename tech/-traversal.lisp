@@ -342,13 +342,6 @@
    time this table already exists.")
 
 
-(defparameter *traversal-dependency-key-cache*
-  (make-hash-table :test #'eql :synchronized t)
-  "Maps an idb storage key to whether its relation is in *TRAVERSAL-STATE-DEPENDENCIES*.
-   Classifying a key costs a CONVERT-TO-PROPOSITION, so it is done once per distinct key
-   rather than once per state.")
-
-
 (define-problem-helper register-traversal-cache-parameter (symbol)
   "Declare that a builder reads SYMBOL's value, so the cache key carries it.  A separate
    registrar rather than a sixth argument to REGISTER-TRAVERSAL-KIND: the parameter belongs
@@ -359,35 +352,13 @@
   symbol)
 
 
-(defun traversal-dependency-key-p (key)
-  "Whether the idb entry stored under KEY belongs to a relation the builders read.  A
-   bijective relation is stored under its two generated index names rather than its own, so
-   the name is resolved back through *BIJECTIVE-CANONICAL* first -- without that step
-   HOLDING, stored as HOLDING1 and HOLDING2, would never match and the cache would ignore
-   what an agent is carrying."
-  (multiple-value-bind (cached present) (gethash key *traversal-dependency-key-cache*)
-    (if present
-      cached
-      (setf (gethash key *traversal-dependency-key-cache*)
-            (let ((name (first (convert-to-proposition key))))
-              (and (member (or (car (gethash name *bijective-canonical*)) name)
-                           *traversal-state-dependencies*)
-                   t))))))
-
-
 (defun traversal-cache-key (state agent source)
   "STATE's projection onto the declared dependencies, tagged with AGENT, SOURCE, and every
-   registered parameter value.  The projection carries each entry's stored value, not just
-   its presence, so a fluent relation discriminates correctly.  Sorting by storage key makes
-   the list canonical for EQUAL."
-  (let ((projection nil))
-    (maphash (lambda (key value)
-               (when (traversal-dependency-key-p key)
-                 (push (cons key value) projection)))
-             (problem-state.idb state))
-    (list agent source
-          (mapcar #'symbol-value *traversal-cache-parameters*)
-          (sort projection #'< :key #'car))))
+   registered parameter value.  The projection is the engine's content-based snapshot, so
+   the key stays sound under symmetry pruning: a renamed state has a renamed key."
+  (list agent source
+        (mapcar #'symbol-value *traversal-cache-parameters*)
+        (state-relations-projection state *traversal-state-dependencies*)))
 
 
 (defun traversal-segments-value (state agent source)
@@ -604,7 +575,6 @@
 
 (register-worker-read-memo '*traversal-canonical-families* :empty-table)
 (register-worker-read-memo '*traversal-clause-profiles* :empty-table)
-(register-worker-read-memo '*traversal-dependency-key-cache* :empty-table)
 (register-worker-read-memo '*traversal-segment-cache* :empty-table)
 (register-worker-read-configuration '*traversal-state-dependencies*
                                     '*traversal-cache-parameters* '*traversal-kinds*)
