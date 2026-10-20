@@ -1583,7 +1583,8 @@
     (dolist (type '(box fan))
       (dolist (object (census-type-instances type))
         (push (list object
-                    (if (vertical-axis-p object)
+                    (if (eq (third (find type *vertical-type-constants* :key #'first))
+                            :vertical)
                       (funcall (symbol-function 'object-height) state object)
                       0))
               supports)))

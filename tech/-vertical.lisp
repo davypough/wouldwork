@@ -123,10 +123,24 @@
    declined to cross-check it against the coordinates.")
 
 
-(defparameter *vertical-type-cache* (make-hash-table :test #'eq)
-  "Memoizes VERTICAL-TYPE-ENTRY by object.  Type membership is fixed for the whole
-   problem instance, so each object is resolved once.  DEFPARAMETER (not DEFVAR) so the
-   cache resets every time this file is respliced and loaded for a different problem.")
+(define-static-relations
+  (vertical-profile> vertical-object $rational $keyword $rational))
+
+
+(define-problem-helper derive-vertical-profile-literals (literals)
+  "Derive (VERTICAL-PROFILE> <object> <height-default> <axis> <base-default>) for every
+   instance of every type in *VERTICAL-TYPE-CONSTANTS*, so the queries read an object's
+   type constants as a static fact rather than handing the object to plain Lisp.  Runs
+   as an initialization literal generator; the table's types are disjoint leaves, and
+   the duplicate fluent key check rejects an object that two entries would both claim."
+  (declare (ignore literals))
+  (loop for (type height axis base) in *vertical-type-constants*
+        append (mapcar (lambda (object)
+                         (list 'vertical-profile> object height axis base))
+                       (init-type-instances type))))
+
+
+(register-init-literal-generator 'derive-vertical-profile-literals)
 
 
 (defparameter *location-elevation-cache* (make-hash-table :test #'eq)
@@ -152,31 +166,6 @@
         (if (bind (has-position ?object $site))
           (fixed-base $site)
           (fixed-base ?object))))))
-
-
-(defun vertical-axis-p (object)
-  "Return true when OBJECT's height raises its top above its base.  Kept a Lisp function
-   rather than inlined into TOP so the axis keyword never reaches the query translator."
-  (eq (third (vertical-type-entry object)) :vertical))
-
-
-(defun vertical-type-entry (object)
-  "Return OBJECT's (TYPE HEIGHT-DEFAULT AXIS BASE-DEFAULT) entry from *VERTICAL-TYPE-CONSTANTS*.
-   The table's types are disjoint leaves, so the first match is the only match.  An
-   object outside the table has no place in the vertical model, which is an authoring
-   error rather than a zero height -- saying so here is what keeps a mistargeted caller
-   from silently reading NIL.  Memoized; see *VERTICAL-TYPE-CACHE*."
-  (multiple-value-bind (cached present) (gethash object *vertical-type-cache*)
-    (if present
-      cached
-      (setf (gethash object *vertical-type-cache*)
-            (or (find-if (lambda (entry)
-                           (member object (gethash (first entry) *types*)))
-                         *vertical-type-constants*)
-                (error "~%No vertical type constants are defined for ~S.~%~
-                        Every object reaching BASE, TOP, or OBJECT-HEIGHT must belong to ~
-                        one of the leaf types in *VERTICAL-TYPE-CONSTANTS*."
-                       object))))))
 
 
 (defun location-elevation-value (state location)
@@ -211,7 +200,7 @@
     ((bind (gate-segment> ?object $gx1 $gy1 $gx2 $gy2 $gz)) $gz)
     ((bind (screen-segment> ?object $sx1 $sy1 $sx2 $sy2 $sz)) $sz)
     ((bind (has-elevation ?object $level)) $level)
-    (t (fourth (vertical-type-entry ?object)))))
+    ((bind (vertical-profile> ?object $default-height $axis $default-base)) $default-base)))
 
 
 (define-query location-elevation (?location location)
@@ -235,7 +224,8 @@
 (define-query top (?object vertical-object)
   ;; Base plus height along a vertical axis, base alone otherwise.  A wall-repeater's
   ;; height projects horizontally from the wall it hangs on and so cannot raise its tip.
-  (if (vertical-axis-p ?object)
+  (if (and (bind (vertical-profile> ?object $default-height $axis $default-base))
+           (eq $axis :vertical))
     (+ (base ?object) (object-height ?object))
     (base ?object)))
 
@@ -244,9 +234,9 @@
   ;; The object's own extent along its axis: authored, or this type's default.
   (if (bind (has-height ?object $height))
     $height
-    (second (vertical-type-entry ?object))))
+    (if (bind (vertical-profile> ?object $default-height $axis $default-base))
+      $default-height)))
 
 
 ;; Each worker owns the lazy technology caches it can populate.
-(register-worker-read-memo '*vertical-type-cache* :empty-table)
 (register-worker-read-memo '*location-elevation-cache* :empty-table)

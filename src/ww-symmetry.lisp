@@ -714,7 +714,7 @@
     car cdr caar cadr cdar cddr caddr cdddr cadddr copy-list copy-tree reverse nreverse
     remove delete remove-duplicates delete-duplicates union intersection set-difference
     adjoin member find assoc rassoc values identity progn prog1 prog2 when unless and or
-    do block the locally return pop alexandria:flatten alexandria:ensure-list)
+    do block the locally return pop alexandria:flatten alexandria:ensure-list subsets-up-to)
   "Name-free operators whose result carries their arguments' taint.")
 
 

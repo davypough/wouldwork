@@ -1,5 +1,5 @@
 ;;; Receiver factorial diagnostic. Explicitly load after ww-table-read-probe.
-;;; No production function replacement or search. Vertical memo binds to private copies.
+;;; No production function replacement or search.
 (in-package :ww)
 
 (defvar *receiver-table-probe-results* nil)
@@ -32,7 +32,6 @@
                  (not (member head *query-names*))
                  (not (member head '(update-receiver-status! problem-state.idb
                                      add-int-prop-key del-int-prop-key worker-object-code
-                                     vertical-type-entry vertical-axis-p
                                      beam-coordinates-projection-parameter))))
         (error "Unaudited receiver dependency: ~S" head))
       (append (when (member head *query-names*) (list head))
@@ -80,16 +79,6 @@
                   ,@(mapcar (lambda (part) (receiver-probe-rewrite part names))
                             (if (stringp (third form)) (cdddr form) (cddr form))))))))
 
-(defun receiver-probe-vertical-cache ()
-  "Prefill a private memo outside timing using the audited original helper."
-  (let ((*vertical-type-cache*
-          (table-read-probe-copy *vertical-type-cache*
-                                (sb-ext:hash-table-synchronized-p *vertical-type-cache*))))
-    (dolist (entry *vertical-type-constants*)
-      (dolist (object (gethash (first entry) *types*))
-        (vertical-type-entry object)))
-    *vertical-type-cache*))
-
 (defun receiver-probe-call (function state static codes original-p)
   (let ((*detect-propagated-changes* t) (*propagated-state-changed* nil)
         (*idb-hash-acc* nil) (*fixed-idb-hash-acc* nil) (*symmetry-idb-acc* nil))
@@ -108,8 +97,8 @@
 
 (defun receiver-probe-kernel (context keys passes)
   (declare (ignore keys) (optimize (speed 3) (safety 1) (debug 1)))
-  (destructuring-bind (function static codes states vertical-cache) context
-    (let ((*vertical-type-cache* vertical-cache) (*detect-propagated-changes* t) (*propagated-state-changed* nil)
+  (destructuring-bind (function static codes states) context
+    (let ((*detect-propagated-changes* t) (*propagated-state-changed* nil)
           (*idb-hash-acc* nil) (*fixed-idb-hash-acc* nil) (*symmetry-idb-acc* nil))
       (dotimes (pass passes)
         (dolist (state states) (funcall function state static codes))))
@@ -127,21 +116,17 @@
                        (table-read-probe-copy static (sb-ext:hash-table-synchronized-p static)) static)
                    (if private-codes
                        (table-read-probe-copy codes (sb-ext:hash-table-synchronized-p codes)) codes)
-                   (mapcar #'copy-problem-state states)
-                   (receiver-probe-vertical-cache)))))
+                   (mapcar #'copy-problem-state states)))))
     (dolist (context contexts)
-      (let ((*vertical-type-cache* (fifth context)))
-        (receiver-probe-verify function states (second context) (third context))))
+      (receiver-probe-verify function states (second context) (third context)))
     (let ((result (table-read-probe-case contexts (coerce states 'vector) passes
                                         :kernel #'receiver-probe-kernel)))
       (dolist (context contexts)
         (assert (equalp (second context) *static-idb*))
         (assert (equalp (third context) *constant-integers*))
-        (assert (equalp (fifth context) (receiver-probe-vertical-cache)))
         (loop for seed in states for final in (fourth context)
               do (let ((expected (copy-problem-state seed)))
-                   (let ((*vertical-type-cache* (fifth context)))
-                     (receiver-probe-call #'update-receiver-status! expected nil nil t))
+                   (receiver-probe-call #'update-receiver-status! expected nil nil t)
                    (assert (equalp (problem-state.idb expected)
                                    (problem-state.idb final))))))
       (append (list :private-static private-static :private-codes private-codes
@@ -167,8 +152,7 @@
       (append base altered))))
 
 (defun receiver-probe-outcomes (states)
-  (let ((*vertical-type-cache* (receiver-probe-vertical-cache))
-        (key (+ (gethash 'active *constant-integers*)
+  (let ((key (+ (gethash 'active *constant-integers*)
                 (* 1000 (gethash 'receiver1 *constant-integers*)))))
     (loop for seed in states
           for state = (copy-problem-state seed)
@@ -203,7 +187,7 @@ Timing repeats settled receiver updates on synthetic gate configurations, not se
                           :workload :settled-receiver-updates
                           :static-sync (sb-ext:hash-table-synchronized-p *static-idb*)
                           :codes-sync (sb-ext:hash-table-synchronized-p *constant-integers*)
-                          :vertical-cache :private-prefilled :hash-folding nil :clock internal-time-units-per-second
+                          :hash-folding nil :clock internal-time-units-per-second
                           :policy '(speed 3 safety 1 debug 1)))
             (setf *receiver-table-probe-results* nil)
             (dotimes (round rounds)
