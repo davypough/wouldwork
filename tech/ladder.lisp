@@ -90,38 +90,37 @@
 ;;;; SUPPORT-CHANGING TRANSITIONS ;;;;
 
 
-(define-problem-helper ladder-configuration-transition-for-family
-    (state agent source-configuration destination family)
-  "Return the first feasible supported-source LADDER transition among FAMILY's climb-kind
-   clauses, or NIL."
-  (let ((source (first source-configuration))
-        (destination-configuration (list destination 'ground)))
-    (loop for clause in (traversal-family-kind-clauses
-                          state source destination family 'climb)
-          for segment = (ladder-segment-for-clause
-                          state agent source destination clause)
-          when segment
-            return (list 'ladder
-                         source-configuration
-                         (third segment)
-                         destination-configuration))))
+(define-problem-helper ladder-crossing-witness-for-family
+    (state agent source destination family)
+  "Return the witness of the first feasible LADDER crossing among FAMILY's climb-kind
+   clauses from location SOURCE to DESTINATION, or NIL.  The calling query attaches the
+   configurations, so no support reaches plain Lisp."
+  (loop for clause in (traversal-family-kind-clauses
+                        state source destination family 'climb)
+        for segment = (ladder-segment-for-clause
+                        state agent source destination clause)
+        when segment
+          return (third segment)))
 
 
 (define-query ladder-configuration-transitions
     (?agent agent ?source-configuration)
-  (do (assign $source (first ?source-configuration))
+  ;; The source location is read from HAS-LOCATION rather than the configuration, so that
+  ;; it reaches plain Lisp free of the support the configuration names.
+  (do (bind (has-location ?agent $source))
       (assign $source-place (second ?source-configuration))
       (assign $transitions nil)
       (if (not (eql $source-place 'ground))
         (doall (?destination location)
           (if (bind (traverse-via> $source $family ?destination))
-            (do (assign $transition
-                        (ladder-configuration-transition-for-family
-                          state ?agent ?source-configuration
-                          ?destination $family))
-                (if $transition
+            (do (assign $witness
+                        (ladder-crossing-witness-for-family
+                          state ?agent $source ?destination $family))
+                (if $witness
                   (assign $transitions
-                          (cons $transition $transitions)))))))
+                          (cons (list 'ladder ?source-configuration $witness
+                                      (list ?destination 'ground))
+                                $transitions)))))))
       $transitions))
 
 

@@ -10,7 +10,8 @@
 ;;;   driver   : propagate-changes! (master), called by MOVE's effect and nested above
 ;;;              rather than assumed from a peer
 ;;; PROVIDES:
-;;;   query    : movement-results
+;;;   queries  : movement-results, movement-results-in-state, action-movement-results,
+;;;              replay-movement-results
 ;;;   action   : move
 
 (include-tech -propagation)
@@ -31,60 +32,54 @@
                         (second result))))
 
 
-(define-problem-helper transition-movement-results-in-state (state agent)
-  "Return configuration transitions as singleton movement routes."
-  (mapcar
-    (lambda (transition)
-      (list (fourth transition) (list transition)))
-    (funcall (symbol-function 'configuration-transition-results)
-             state agent)))
-
-
-(define-problem-helper movement-results-in-state (state agent source-configuration)
-  "Collect grounded routes before explicit support transitions for AGENT."
-  (let ((transitions
-          (transition-movement-results-in-state state agent)))
-    (if (eql (second source-configuration) 'ground)
-      (nconc
-        (grounded-movement-results-in-state
-          state agent (first source-configuration))
-        transitions)
-      transitions)))
+(define-query movement-results-in-state (?agent agent ?source-configuration)
+  ;; Grounded routes before explicit support transitions.  The source location comes from
+  ;; HAS-LOCATION rather than the configuration, so no support reaches plain Lisp.
+  (do (bind (has-location ?agent $source-location))
+      (assign $routes
+              (ww-loop for $transition in (configuration-transition-results ?agent)
+                       collect (list (fourth $transition) (list $transition))))
+      (if (eql (second ?source-configuration) 'ground)
+        (append (grounded-movement-results-in-state state ?agent $source-location)
+                $routes)
+        $routes)))
 
 
 (define-problem-helper replay-grounded-movement-result
-    (state agent source route)
-  "Check every supplied transparent segment before constructing its endpoint.  A segment
-   need not be the one search would choose, only a legal one: see
-   MOBILITY-SEGMENT-REPLAYABLE-P."
-  (unless (and route (eql (second source) 'ground))
-    (return-from replay-grounded-movement-result nil))
-  (let ((location (first source)))
+    (state agent source-location route)
+  "Check every supplied transparent segment of ROUTE from grounded SOURCE-LOCATION before
+   constructing its endpoint.  A segment need not be the one search would choose, only a
+   legal one: see MOBILITY-SEGMENT-REPLAYABLE-P.  An empty or closed route yields NIL."
+  (let ((location source-location))
     (dolist (segment route)
       (unless (mobility-segment-replayable-p state agent location segment)
         (return-from replay-grounded-movement-result nil))
       (setf location (fourth segment)))
-    (unless (eql location (first source))
+    (unless (eql location source-location)
       (list (list location 'ground) route))))
 
 
-(define-problem-helper replay-movement-results (state agent source route)
-  "Accept legal transparent routes or one explicit support transition."
-  (let ((grounded (replay-grounded-movement-result state agent source route)))
-    (cond (grounded (list grounded))
-          ((and (= (length route) 1)
-                (member (first route)
-                        (configuration-provider-transitions state agent source)
-                        :test #'equal))
-           (list (list (fourth (first route)) route))))))
+(define-query replay-movement-results (?agent agent ?source-configuration ?route)
+  ;; Accept a legal transparent route from the ground, or one explicit support transition.
+  (do (bind (has-location ?agent $source-location))
+      (assign $grounded
+              (if (eql (second ?source-configuration) 'ground)
+                (replay-grounded-movement-result state ?agent $source-location ?route)))
+      (if $grounded
+        (list $grounded)
+        (if (and (= (length ?route) 1)
+                 (member (first ?route)
+                         (configuration-provider-transitions ?agent ?source-configuration)
+                         :test #'equal))
+          (list (list (fourth (first ?route)) ?route))))))
 
 
-(define-problem-helper action-movement-results (state agent source)
-  "Use supplied MOVE routes during replay and canonical routes during search."
+(define-query action-movement-results (?agent agent ?source-configuration)
+  ;; Use supplied MOVE routes during replay and canonical routes during search.
   (if (eq (first *replay-action*) 'move)
-    (when (eq agent (second *replay-action*))
-      (replay-movement-results state agent source (third *replay-action*)))
-    (movement-results-in-state state agent source)))
+    (if (eq ?agent (second *replay-action*))
+      (replay-movement-results ?agent ?source-configuration (third *replay-action*)))
+    (movement-results-in-state ?agent ?source-configuration)))
 
 
 (define-query movement-results (?agent agent)
@@ -95,8 +90,7 @@
   (if (bind (has-location ?agent $agent-location))
     (do (assign $source-configuration (agent-configuration ?agent))
         (assign $results
-                (movement-results-in-state
-                  state ?agent $source-configuration))
+                (movement-results-in-state ?agent $source-configuration))
         $results)))
 
 
@@ -106,8 +100,7 @@
   (and (bind (has-location ?agent $agent-location))
        (assign $source-configuration (agent-configuration ?agent))
        (assign $movement-results
-               (action-movement-results
-                 state ?agent $source-configuration)))
+               (action-movement-results ?agent $source-configuration)))
   (">" ?agent "moves via" $route)
   (ww-loop for $result in $movement-results
            do (assert

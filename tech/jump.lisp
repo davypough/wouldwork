@@ -51,7 +51,8 @@
 ;;;   queries   : jump-elevation-reachable, vaultable-object-passable,
 ;;;               jump-barrier-top-elevation, vaultable-object-list,
 ;;;               jump-required-clearance-height, jump-path-clear,
-;;;               jump-landing-support-at, jump-configuration-transitions
+;;;               jump-landing-support-at, jump-crossing-transition,
+;;;               jump-configuration-transitions
 ;;;   provider  : jump-configuration-transitions registered with
 ;;;               -configuration-transition
 ;;;   action    : move (grounded routes and support changes)
@@ -133,26 +134,36 @@
 
 (define-problem-helper jump-segment-for-clause
     (state agent source destination clause)
-  "Return a normalized JUMP or VAULT segment when CLAUSE's features can be cleared from
-   SOURCE's level and the landing is within reach.  The label is VAULT when some feature
-   genuinely required clearance for this agent, else JUMP.  The features are the clause
-   without its edges; the witness is the whole canonical clause."
-  (let ((features (canonical-enabling-means (second (traversal-clause-profile clause))))
-        (source-elevation
-          (funcall (symbol-function 'location-elevation) state source))
-        (target-elevation
-          (funcall (symbol-function 'location-elevation) state destination)))
+  "Return a normalized JUMP or VAULT segment when CLAUSE permits a crossing from SOURCE's
+   level to DESTINATION's (see JUMP-CROSSING-MODE).  The witness is the whole canonical
+   clause."
+  (let ((mode (jump-crossing-mode
+                state agent
+                (funcall (symbol-function 'location-elevation) state source)
+                destination
+                (funcall (symbol-function 'location-elevation) state destination)
+                clause)))
+    (when mode
+      (list mode source (canonical-enabling-means clause) destination))))
+
+
+(define-problem-helper jump-crossing-mode
+    (state agent source-elevation destination target-elevation clause)
+  "Return VAULT or JUMP when CLAUSE's features can be cleared from SOURCE-ELEVATION, the
+   landing at TARGET-ELEVATION is within reach, and DESTINATION is safe, else NIL.  The
+   label is VAULT when some feature genuinely required clearance for this agent, else JUMP.
+   The features are the clause without its edges."
+  (let ((features (canonical-enabling-means (second (traversal-clause-profile clause)))))
     (when (and
             (funcall (symbol-function 'jump-path-clear)
                      state agent source-elevation features)
             (funcall (symbol-function 'jump-elevation-reachable)
                      state agent source-elevation target-elevation)
             (funcall (symbol-function 'safe) state destination))
-      (list (if (funcall (symbol-function 'jump-required-clearance-height)
-                         state agent features)
-              'vault
-              'jump)
-            source (canonical-enabling-means clause) destination))))
+      (if (funcall (symbol-function 'jump-required-clearance-height)
+                   state agent features)
+        'vault
+        'jump))))
 
 
 (register-traversal-kind 'jump 'jump-segment-for-clause
@@ -188,47 +199,62 @@
                 (different $holder ?agent)))))
 
 
-(define-problem-helper jump-configuration-transition-for-clause
-    (state agent source-configuration source-elevation
-           destination-configuration target-elevation clause)
-  "Return one feasible support-changing JUMP or VAULT transition across CLAUSE, or NIL.
-   As in JUMP-SEGMENT-FOR-CLAUSE, the features exclude edges and the witness does not."
-  (let ((features (canonical-enabling-means (second (traversal-clause-profile clause))))
-        (destination (first destination-configuration)))
-    (when (and
-            (funcall (symbol-function 'jump-path-clear)
-                     state agent source-elevation features)
-            (funcall (symbol-function 'jump-elevation-reachable)
-                     state agent source-elevation target-elevation)
-            (funcall (symbol-function 'safe) state destination))
-      (list (if (funcall (symbol-function 'jump-required-clearance-height)
-                         state agent features)
-              'vault
-              'jump)
-            source-configuration (canonical-enabling-means clause)
-            destination-configuration))))
+(define-problem-helper jump-crossing-for-families
+    (state agent source source-elevation destination target-elevation families)
+  "The (mode witness) crossing to report from location SOURCE to DESTINATION, or NIL.
+   FAMILIES are the symmetric and directed families authored for the pair; each offers its
+   first permitted jump-kind clause.  Among those the least by label and witness wins.  The
+   calling query attaches the supports at either end, so no support reaches plain Lisp."
+  (let ((crossings
+          (loop for family in families
+                for crossing = (jump-crossing-for-family
+                                 state agent source source-elevation
+                                 destination target-elevation family)
+                when crossing
+                  collect crossing)))
+    (first (sort crossings #'string< :key #'configuration-transition-key))))
 
 
-(define-problem-helper jump-configuration-transition-for-family
-    (state agent source-configuration source-elevation
-           destination-configuration target-elevation family)
-  "The first transition FAMILY's jump-kind clauses permit, in canonical order, or NIL.
-   The configuration twin of -traversal's TRAVERSAL-SEGMENT-FOR-FAMILY, which cannot serve
-   here because these endpoints are configurations rather than locations.  Kind is judged
-   between the two locations, as for a grounded segment, whatever supports the endpoints."
+(define-problem-helper jump-crossing-for-family
+    (state agent source source-elevation destination target-elevation family)
+  "The (mode witness) crossing of the first clause among FAMILY's jump-kind clauses, in
+   canonical order, that permits one, or NIL.  The configuration twin of -traversal's
+   TRAVERSAL-SEGMENT-FOR-FAMILY: the elevations are explicit because either end may be a
+   support.  Kind is judged between the two locations, as for a grounded segment."
   (loop for clause in (traversal-family-kind-clauses
-                        state (first source-configuration)
-                        (first destination-configuration) family 'jump)
-        for transition = (jump-configuration-transition-for-clause
-                           state agent source-configuration source-elevation
-                           destination-configuration target-elevation clause)
-        when transition
-          return transition))
+                        state source destination family 'jump)
+        for mode = (jump-crossing-mode
+                     state agent source-elevation destination target-elevation clause)
+        when mode
+          return (list mode (canonical-enabling-means clause))))
+
+
+(define-query jump-crossing-transition
+    (?agent agent ?source-configuration ?source location ?source-elevation
+     ?destination-configuration ?destination location ?target-elevation)
+  ;; The support-changing transition the authored traversal facts allow between the two
+  ;; configurations, or NIL.  The locations come separately from the configurations so that
+  ;; only fixed objects reach plain Lisp.
+  (do (assign $families nil)
+      (if (bind (traverse-via ?source $symmetric-family ?destination))
+        (assign $families (cons $symmetric-family $families)))
+      (if (bind (traverse-via> ?source $directed-family ?destination))
+        (assign $families (cons $directed-family $families)))
+      (if $families
+        (do (assign $crossing
+                    (jump-crossing-for-families
+                      state ?agent ?source ?source-elevation
+                      ?destination ?target-elevation $families))
+            (if $crossing
+              (list (first $crossing) ?source-configuration (second $crossing)
+                    ?destination-configuration))))))
 
 
 (define-query jump-configuration-transitions
     (?agent agent ?source-configuration)
-  (do (assign $source-location (first ?source-configuration))
+  ;; The source location is read from HAS-LOCATION rather than the configuration, so that
+  ;; it reaches plain Lisp free of the support the configuration names.
+  (do (bind (has-location ?agent $source-location))
       (assign $source-place (second ?source-configuration))
       (assign $source-elevation
               (if (eql $source-place 'ground)
@@ -274,63 +300,25 @@
                    ?agent ?landing-support $destination)
                  (cleartop ?landing-support ?agent)
                  (support-use-allowed ?agent ?landing-support))
-          (do (assign $destination-configuration
-                      (list $destination ?landing-support))
-              (assign $target-elevation
-                      (top ?landing-support))
-              (assign $symmetric-transition nil)
-              (assign $directed-transition nil)
-              (if (bind (traverse-via
-                          $source-location $symmetric-family $destination))
-                (assign $symmetric-transition
-                        (jump-configuration-transition-for-family
-                          state ?agent ?source-configuration $source-elevation
-                          $destination-configuration $target-elevation
-                          $symmetric-family)))
-              (if (bind (traverse-via>
-                          $source-location $directed-family $destination))
-                (assign $directed-transition
-                        (jump-configuration-transition-for-family
-                          state ?agent ?source-configuration $source-elevation
-                          $destination-configuration $target-elevation
-                          $directed-family)))
-              (if $symmetric-transition
-                (assign $transitions
-                        (cons $symmetric-transition $transitions)))
-              (if $directed-transition
-                (assign $transitions
-                        (cons $directed-transition $transitions))))))
+          (do (assign $transition
+                      (jump-crossing-transition
+                        ?agent ?source-configuration $source-location $source-elevation
+                        (list $destination ?landing-support) $destination
+                        (top ?landing-support)))
+              (if $transition
+                (assign $transitions (cons $transition $transitions))))))
 
       ;; Only a supported source uses an authored jump clause to land on remote ground;
       ;; grounded versions of the same clauses belong to -traversal's segment provider.
       (if (not (eql $source-place 'ground))
         (doall (?destination location)
-          (do (assign $destination-configuration
-                      (list ?destination 'ground))
-              (assign $target-elevation
-                      (location-elevation ?destination))
-              (assign $symmetric-transition nil)
-              (assign $directed-transition nil)
-              (if (bind (traverse-via
-                          $source-location $symmetric-family ?destination))
-                (assign $symmetric-transition
-                        (jump-configuration-transition-for-family
-                          state ?agent ?source-configuration $source-elevation
-                          $destination-configuration $target-elevation
-                          $symmetric-family)))
-              (if (bind (traverse-via>
-                          $source-location $directed-family ?destination))
-                (assign $directed-transition
-                        (jump-configuration-transition-for-family
-                          state ?agent ?source-configuration $source-elevation
-                          $destination-configuration $target-elevation
-                          $directed-family)))
-              (if $symmetric-transition
-                (assign $transitions
-                        (cons $symmetric-transition $transitions)))
-              (if $directed-transition
-                (assign $transitions
-                        (cons $directed-transition $transitions))))))
+          (do (assign $transition
+                      (jump-crossing-transition
+                        ?agent ?source-configuration $source-location $source-elevation
+                        (list ?destination 'ground) ?destination
+                        (location-elevation ?destination)))
+              (if $transition
+                (assign $transitions (cons $transition $transitions))))))
       $transitions))
 
 

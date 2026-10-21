@@ -18,8 +18,11 @@
 ;;;               tray declared optional here so agent movement never requires a problem
 ;;;               to declare tray objects)
 ;;; PROVIDES:
-;;;   query     : agent-configuration, configuration-transition-results
-;;;   functions : register-configuration-transition-provider and canonical selection helpers
+;;;   query     : agent-configuration, configuration-provider-transitions (installed at INIT
+;;;               from the registered providers), configuration-transition-results
+;;;   functions : register-configuration-transition-provider,
+;;;               install-configuration-provider-transitions, configuration-transition-key
+
 ;;;   update    : apply-agent-configuration!  --  also relocates a held tray and its
 ;;;               riders, keeping the tray's has-location synced to its holder's
 ;;;               relocate-tray-and-riders! -- typed entry to -support-motion's shared
@@ -53,63 +56,58 @@
 
 
 (define-problem-helper configuration-transition-key (transition)
-  "Return the stable lexical key for a normalized semantic transition."
+  "Return the stable lexical key for a normalized semantic transition, or for any part of
+   one built from fixed objects alone."
   (let ((*print-case* :upcase)
         (*print-pretty* nil)
         (*package* (find-package :ww)))
     (prin1-to-string transition)))
 
 
-(define-problem-helper configuration-transition-precedes-p
-    (transition1 transition2)
-  "Order transitions by their normalized semantic representation."
-  (string< (configuration-transition-key transition1)
-           (configuration-transition-key transition2)))
+(define-problem-helper install-configuration-provider-transitions ()
+  "Install CONFIGURATION-PROVIDER-TRANSITIONS as spec code that calls every registered
+   provider by name, in registration order.  Collecting the transitions in spec code keeps
+   the supports they name out of plain Lisp, so the symmetry safety check follows them
+   through each provider.  Deferred to INIT because providers register from technologies
+   spliced after this one."
+  (install-query 'configuration-provider-transitions
+                 '(?agent agent ?source-configuration)
+                 `(validated-configuration-transitions
+                    (append ,@(mapcar (lambda (provider)
+                                        (list provider '?agent '?source-configuration))
+                                      (reverse *configuration-transition-providers*)))
+                    ?source-configuration)))
 
 
-(define-problem-helper valid-agent-configuration-p (configuration)
-  "Whether CONFIGURATION is a normalized (location ground-or-support) pair."
-  (and (listp configuration)
-       (= (length configuration) 2)
-       (member (first configuration) (gethash 'location *types*) :test #'eq)
-       (or (eql (second configuration) 'ground)
-           (member (second configuration) (gethash 'support *types*) :test #'eq))))
+(define-query valid-agent-configuration (?configuration)
+  ;; Whether ?CONFIGURATION is a normalized (location ground-or-support) pair.
+  (and (listp ?configuration)
+       (= (length ?configuration) 2)
+       (assign $location (first ?configuration))
+       (assign $place (second ?configuration))
+       (location $location)
+       (or (eql $place 'ground)
+           (support $place))))
 
 
-(define-problem-helper validate-configuration-transition (transition source)
-  "Signal an error unless TRANSITION obeys the normalized provider contract."
-  (unless (and (listp transition)
-               (= (length transition) 4)
-               (symbolp (first transition))
-               (equal (second transition) source)
-               (valid-agent-configuration-p (second transition))
-               (valid-agent-configuration-p (fourth transition))
-               (not (equal (second transition) (fourth transition))))
-    (error "Invalid configuration transition from ~S: ~S" source transition))
-  transition)
+(define-query validated-configuration-transitions (?transitions ?source-configuration)
+  ;; Signal an error unless every transition obeys the normalized provider contract.
+  (do (ww-loop for $transition in ?transitions
+               do (if (not (and (listp $transition)
+                                (= (length $transition) 4)
+                                (symbolp (first $transition))
+                                (equal (second $transition) ?source-configuration)
+                                (valid-agent-configuration (second $transition))
+                                (valid-agent-configuration (fourth $transition))
+                                (not (equal (second $transition) (fourth $transition)))))
+                    (error "Invalid configuration transition from ~S: ~S"
+                           ?source-configuration $transition)))
+      ?transitions))
 
 
-(define-problem-helper configuration-provider-transitions
-    (state agent source)
-  "Collect, validate, deduplicate, and canonically order provider transitions."
-  (let ((transitions nil))
-    (dolist (provider *configuration-transition-providers*)
-      (dolist (transition (funcall (symbol-function provider) state agent source))
-        (push (validate-configuration-transition transition source)
-              transitions)))
-    (sort (remove-duplicates transitions :test #'equal)
-          #'configuration-transition-precedes-p)))
-
-
-(define-problem-helper canonical-configuration-transitions (transitions)
-  "Retain the first canonical transition to each distinct destination configuration."
-  (let ((destinations (make-hash-table :test #'equal))
-        (selected nil))
-    (dolist (transition transitions (nreverse selected))
-      (let ((destination (fourth transition)))
-        (unless (gethash destination destinations)
-          (setf (gethash destination destinations) t)
-          (push transition selected))))))
+(define-query configuration-provider-transitions (?agent agent ?source-configuration)
+  ;; Placeholder.  INSTALL-CONFIGURATION-PROVIDER-TRANSITIONS replaces this body at INIT.
+  (error "CONFIGURATION-PROVIDER-TRANSITIONS was not installed from the registered providers."))
 
 
 (define-query agent-configuration (?agent agent)
@@ -122,10 +120,18 @@
 
 
 (define-query configuration-transition-results (?agent agent)
+  ;; The first transition to each distinct destination configuration, in provider order.
+  ;; Transitions to one destination lead to the same state and differ only in the route
+  ;; label.  Each provider lists its transitions in the position's own visit order, so the
+  ;; choice never depends on support names.
   (do (assign $source (agent-configuration ?agent))
-      (assign $transitions
-              (configuration-provider-transitions state ?agent $source))
-      (canonical-configuration-transitions $transitions)))
+      (assign $selected nil)
+      (assign $destinations nil)
+      (ww-loop for $transition in (configuration-provider-transitions ?agent $source)
+               do (if (not (member (fourth $transition) $destinations :test #'equal))
+                    (do (assign $destinations (cons (fourth $transition) $destinations))
+                        (assign $selected (cons $transition $selected)))))
+      (reverse $selected)))
 
 
 (define-update relocate-tray-and-riders! (?tray tray ?destination location)
@@ -142,5 +148,8 @@
       (if (and (bind (holding ?agent $held))
                (tray $held))
         (relocate-tray-and-riders! $held (first ?destination-configuration)))))
+
+
+(register-deferred-action-installer 'install-configuration-provider-transitions)
 
 (register-worker-read-configuration '*configuration-transition-providers*)
