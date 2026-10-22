@@ -54,6 +54,11 @@
    (:all . spot texts) for spots that affect every family.")
 
 
+(defparameter *symmetry-family-statuses* nil
+  "Each detected family's verdict, an alist of (family . status) (see
+   SYMMETRY-FAMILY-STATUS), recorded when the families are pruned.")
+
+
 (sb-ext:defglobal *symmetry-pruning-count* 0
   "Count of action instantiations pruned due to symmetry during search.")
 (declaim (type fixnum *symmetry-pruning-count*))
@@ -608,12 +613,20 @@
 (defun prune-inoperative-symmetry-groups ()
   "Keep only families whose every action use is permutation-safe and that the flow check
    passes clean.  A single identity-sensitive use invalidates a family for global
-   canonicalization, even when another action could use that family safely."
+   canonicalization, even when another action could use that family safely.  Each
+   family's verdict is recorded first, then the symmetric action parameters are
+   recomputed for the kept families alone, so local filtering skips dropped ones."
+  (setf *symmetry-family-statuses*
+        (mapcar (lambda (family)
+                  (cons family (symmetry-family-status family)))
+                *symmetry-families*))
   (setf *symmetry-families*
-        (remove-if-not (lambda (family)
-                         (eq (symmetry-family-status family) :kept))
-                       *symmetry-families*))
-  (rebuild-symmetry-lookups))
+        (loop for (family . status) in *symmetry-family-statuses*
+              when (eq status :kept)
+                collect family))
+  (rebuild-symmetry-lookups)
+  (clrhash *symmetric-type-parameters*)
+  (identify-symmetric-action-parameters))
 
 
 (defun symmetry-family-status (family)
@@ -2089,7 +2102,8 @@
         (*object-to-symmetry-group* (make-hash-table :test #'eq))
         (*object-to-symmetry-membership* (make-hash-table :test #'eq))
         (*symmetric-type-parameters* (make-hash-table :test #'eq))
-        (*symmetry-safety-report* nil))
+        (*symmetry-safety-report* nil)
+        (*symmetry-family-statuses* nil))
     (detect-symmetry-groups)
     (if (rest *symmetry-safety-report*)
       (print-symmetry-safety-report)
@@ -2105,7 +2119,7 @@
           unless (eq family :all)
             do (format t "  ~A: ~A~%"
                        (symmetry-family.rows family)
-                       (ecase (symmetry-family-status family)
+                       (ecase (cdr (assoc family *symmetry-family-statuses*))
                          (:unsafe-action "dropped (an action parameter use is unsafe)")
                          (:kept "kept; passes the full check")
                          (:flagged "dropped; the full check flags it")))
@@ -2143,6 +2157,65 @@
       (t (format nil "~{~A~^, ~}, and ~A" 
                  (butlast objects) 
                  (car (last objects)))))))
+
+
+;;;; SYMMETRY AUDIT ;;;;
+;;; Checks the engine, not the author: on the staged problem, search once with symmetry
+;;; pruning and once without, and compare the outcome and the best objective value.
+;;; Merging renamed positions changes neither, so a mismatch is an engine fault.  Solution
+;;; counts are not compared: merging legitimately drops solutions that differ only by
+;;; renaming interchangeable objects.
+
+
+(defun audit-symmetry ()
+  "Search the staged problem with symmetry pruning on, then off, and compare the outcome
+   status and best objective value.  Needs pruning on with at least one kept family, and
+   *SOLUTION-TYPE* MIN-LENGTH, MIN-TIME, MIN-VALUE, MAX-VALUE or FIRST (FIRST compares the
+   outcome only).  Pruning is switched at run time and restored on exit.  Signals an
+   error on disagreement; returns T otherwise."
+  (unless (and *symmetry-pruning* *symmetry-families*)
+    (error "AUDIT-SYMMETRY needs a staged problem with *symmetry-pruning* on and at least one kept family."))
+  (unless (member *solution-type* '(min-length min-time min-value max-value first))
+    (error "AUDIT-SYMMETRY compares best values; *solution-type* ~A is not min-length, min-time, min-value, max-value or first."
+           *solution-type*))
+  (let ((on-result nil)
+        (off-result nil))
+    (unwind-protect
+        (progn
+          (setf on-result (audit-symmetry-run))
+          (setf *symmetry-pruning* nil)
+          (refresh-symmetry-detection)
+          (invalidate-problem-state-hash *start-state*)
+          (setf off-result (audit-symmetry-run)))
+      (setf *symmetry-pruning* t)
+      (refresh-symmetry-detection))
+    (format t "~2%Symmetry audit (~(~A~), depth cutoff ~D):~%" *solution-type* *depth-cutoff*)
+    (loop for label in '("pruning on: " "pruning off:")
+          for (status objective states duplicates) in (list on-result off-result)
+          do (format t "  ~A outcome ~(~A~), best ~A, ~:D states, ~:D symmetry duplicates~%"
+                     label status (or objective "-") states duplicates))
+    (unless (and (eq (first on-result) (first off-result))
+                 (equalp (second on-result) (second off-result)))
+      (error "Symmetry audit failed: pruning changed the result (on ~S, off ~S)."
+             (subseq on-result 0 2) (subseq off-result 0 2)))
+    (format t "  Results agree.~%")
+    t))
+
+
+(defun audit-symmetry-run ()
+  "Run one search and return (outcome-status best-objective states-processed
+   symmetry-duplicates-pruned).  The best objective is NIL without a solution or for FIRST."
+  (ww-solve)
+  (list (search-outcome-status *last-search-outcome*)
+        (when (and *solutions-valid* *solution-paths*)
+          (ecase *solution-type*
+            (min-length (reduce #'min *solution-paths* :key #'solution.depth))
+            (min-time (reduce #'min *solution-paths* :key #'solution.time))
+            (min-value (reduce #'min *solution-paths* :key #'solution.value))
+            (max-value (reduce #'max *solution-paths* :key #'solution.value))
+            (first nil)))
+        *total-states-processed*
+        *symmetric-duplicates-pruned*))
 
 
 ;;;; INITIALIZATION ;;;;

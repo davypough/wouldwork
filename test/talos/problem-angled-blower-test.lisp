@@ -13,6 +13,9 @@
 ;;;      depressing the plate
 ;;;      and switches gears6 and fan7 off; box6 must remain at delivered5.
 ;;;
+;;; A characterization claim adds a sixth case: two clear boxes waiting at a landing
+;;; destination tie, so the arriving box's landing is undetermined and must signal an error.
+;;;
 ;;; The goal's characterization query verifies all positive outcomes and the absence of
 ;;; stale source/intermediate supports and locations.  Expected minimum solution: one
 ;;; step, mounting agent1 on plate1.
@@ -134,6 +137,24 @@
 
 
 ;;;; CHARACTERIZATION QUERY AND GOAL ;;;;
+
+
+(define-test-claim angled-blower-ambiguous-landing
+  ;; box4 is put back on blowing fan2, and box5 and box6 wait clear at bare2.  The next
+  ;; propagation arcs box4 to bare2, where the two boxes tie in the box category.  The
+  ;; model does not say which one box4 reaches, so LANDING-SUPPORT must signal an error.
+  (expect-condition
+    (lambda ()
+      (let ((state (copy-problem-state *start-state*)))
+        (dolist (fact '((has-location box4 bare2) (has-location box5 final3)
+                        (has-location box6 delivered5)))
+          (delete-proposition fact (problem-state.idb state)))
+        (dolist (fact '((has-location box4 source2) (on box4 fan2)
+                        (has-location box5 bare2) (has-location box6 bare2)))
+          (add-proposition fact (problem-state.idb state)))
+        (invalidate-problem-state-hash state)
+        (funcall 'propagate-changes! state)))
+    'error :containing "Ambiguous landing"))
 
 
 (define-query angled-blower-scenarios-valid ()

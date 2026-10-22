@@ -39,9 +39,6 @@
 
 (ww-set *symmetry-pruning* t)
 
-(ww-set *progress-reporting-interval* 1000000)
-
-
 (ww-set *max-connector-pairings* 3)  ;max termini a connector may pair in one connect (beam-relay's connect-connector)
 
 

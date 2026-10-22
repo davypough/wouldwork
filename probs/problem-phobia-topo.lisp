@@ -13,12 +13,9 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *progress-reporting-interval* 2000000)
-
 (ww-set *symmetry-pruning* t)
 
 (ww-set *depth-cutoff* 20)
-
 
 (ww-set *max-connector-pairings* 2)  ;each connector needs at most one source and one target
 

@@ -16,9 +16,6 @@
 
 (ww-set *depth-cutoff* 16)  ;18 if ghost-stops-recorder
 
-(ww-set *progress-reporting-interval* 3000000)
-
-
 (ww-set *max-connector-pairings* 2)
 
 

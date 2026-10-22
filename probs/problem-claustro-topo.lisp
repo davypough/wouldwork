@@ -18,8 +18,6 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *progress-reporting-interval* 1000000)
-
 (ww-set *symmetry-pruning* t)
 
 (ww-set *depth-cutoff* 34)

@@ -403,8 +403,20 @@ named by the goal, keep them as named objects and enable symmetry pruning
 names. This is the direct representation (Section 2.5): it needs no conservation
 guard, solutions name the actual objects, and the engine finds the interchangeable
 group itself from types, static facts and goal references. At staging, confirm that
-the engine reports the intended group; an object named in the goal or given its own
-static facts is left out of it. Record counts or occupancy instead only when the
+the "Symmetry safety check" lists the intended family as kept; an object named in the
+goal or given its own static facts is left out of it. A family is dropped, with the
+spot named, wherever its members could make the search depend on their names, so write
+code that touches a family by these rules (advisor reference F08):
+
+- pass members only to spec code (queries, updates), never to a `defun` or
+  `define-problem-helper`, and give plain Lisp the state only to hand on to spec code;
+- never write a member's name as a literal in actions, queries, updates or the goal;
+- break ties by facts the state holds, or collect every tie and signal an error, never
+  by name or printed text;
+- don't quantify over a family with `dot-product`.
+
+If a flagged spot cannot be rewritten, leave the objects unnamed instead (one fact per
+occupied place, as in problem-fox-geese-geese-check). Record counts or occupancy instead only when the
 objects are anonymous in the problem itself and numerous enough that their names
 would dominate the state, such as many identical units piled in one place. That is
 an agreed enhancement whose conservation assumption is recorded with its guard, and
@@ -524,7 +536,7 @@ requested answers, costs, and coverage under the agreed premises:
   score is not enough. A bound used to eliminate candidates needs the appropriate
   optimistic guarantee and must fit the selected engine hook's actual contract.
 - Interchangeable objects must preserve legality, goals, costs, and answer identity.
-  With symmetry pruning, confirm the reported symmetry group at staging; with a counts
+  With symmetry pruning, confirm at staging that the safety check keeps the family; with a counts
   encoding, check conservation and how instructions identify the objects. The
   conceptual interchangeability argument alone does not verify the implementation.
 - Duplicate sharing must preserve relevant futures and the required cost comparison,

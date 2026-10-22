@@ -320,7 +320,7 @@ of a result belong here.  The notes below the table give the details and measure
 | Q4 | Do states repeat (moves can be undone, or different orders reach the same state)? (note 2) | spec, then probe: repeated-state percentage | `*tree-or-graph*`; whether backtracking fits |
 | Q5 | Does some quantity change by a fixed amount on every move, **and** does the goal fix its final value? (note 3) | spec: action effects and goal | fixed solution length: `first` rather than `min-length`; exhaustion becomes proof (section 6.2) |
 | Q6 | How large is the space, and how much work does each expansion cost? (note 4) | spec, probe | whether brute force can finish (roughly under a billion program cycles); finer actions, or `bind` for parameters the state fixes |
-| Q7 | Are there interchangeable objects: one type, identical static facts, not named by the goal, and taken by the actions as typed parameters (`?peg peg`)? (note 5) | spec; staging lists the families | `*symmetry-pruning*`, kept only if a timed probe shows it faster (B1); Q18 instead if the names serve no purpose |
+| Q7 | Are there interchangeable objects: one type, identical static facts, not named by the goal? (note 5) | spec; staging lists each family as kept or dropped | `*symmetry-pruning*`, kept only if a timed probe shows it faster (B1); Q18 instead if the names serve no purpose |
 | Q8 | Is there a cheap measure of how close a state is to the goal, and does it ever overestimate the moves still needed? | spec, user, probe | `heuristic?` (B10), kept only if a timed probe shows it faster; if it never overestimates, also try it as `min-steps-remaining?` (Q9) |
 | Q9 | Is there a cheap lower bound on the moves still needed, one that never overestimates? | spec, user | `min-steps-remaining?` (B6) |
 | Q10 | Can some states be proved dead (an invariant broken, a resource gone, a bound exceeded)? | spec, user | `prune-state?` (B2) |
@@ -356,8 +356,9 @@ of a result belong here.  The notes below the table give the details and measure
    read with `bind`, not enumerated and tested: hanoi's `move` took both supports as
    parameters, 880 combinations per state at 8 disks; binding the origin made it 5.4 times
    faster, and a peg-per-disk encoding 13 times.
-5. **Interchangeable objects.**  Objects supplied by a query (`?peg (get-remaining-pegs?)`)
-   are not recognized, so no family is found.  Identical means the same rules (the same static
+5. **Interchangeable objects.**  Staging's safety check keeps a family only if no code the
+   search runs could depend on its members' names, and names the spot when it drops one
+   (advisor reference F08).  Identical means the same rules (the same static
    facts: shape, moves, capacities), not the same appearance: tiles7a's 16 blue tiles share a
    colour, but only its five single squares share a shape.
 6. **Re-encoding.**  Examples: identical pegs or tokens; `loc>` beside `contents>`, or a list
@@ -407,7 +408,7 @@ S14 = C5, S15 = B17.
 
 | Id | Strategy | Use when | How | Cost and cautions |
 |---|---|---|---|---|
-| B1 | **Symmetry pruning** | Q7: interchangeable objects | `*symmetry-pruning*` t; staging reports the groups found | Time it as well as counting what it saves (note 3); drops symmetric variants under `every` (section 5); a re-encoding (B16) is often cheaper |
+| B1 | **Symmetry pruning** | Q7: interchangeable objects | `*symmetry-pruning*` t; staging reports which families are kept | Time it as well as counting what it saves (note 3); `(audit-symmetry)` compares results with pruning on and off; drops symmetric variants under `every` (section 5); a re-encoding (B16) is often cheaper |
 | B2 | **Dead-state pruning** | Q10: some states can be proved dead | `prune-state?` (section 4.1) | Must be **sound**: a test that rejects a live state silently discards solutions (note 3) |
 | B3 | **State constraints** | A rule every state must keep | `define-constraint`: a successor breaking it is discarded as it is generated | Must be a true rule of the puzzle, not a guess |
 | B4 | **Independent-move reordering** | Independent moves made in different orders reach the same state: above all an action choosing members of a set (knap19's `put`) | Spec idiom: the action may choose only an object numbered above every one already chosen, with A3 tree search (`problem-knap19-1.lisp`, note 13).  *Proposed:* an engine version for independent moves in general | Two moves are independent when either order is legal and ends in the same state; argue it for the action before relying on it (note 13).  The engine version would need each action's read and write facts |
@@ -811,7 +812,7 @@ where compatible, applied after staging; see section 1.1 for exceptions and seri
 | `*solution-type*` | first, N, every, all-paths, min-length, min-time, min-value, max-value (first) | from Q2.  `first` at fixed length.  `every` gives one path per goal state; `all-paths` every distinct path to every goal, but only serial depth-first graph search with a depth cutoff (otherwise it falls back to `every`) |
 | `*tree-or-graph*` | tree, graph (graph) | graph when states repeat (Q4: repeated-state percentage high); tree when they rarely do, with happenings, or for better parallel speedup |
 | `*depth-cutoff*` | integer; 0 = none (0) | known or fixed length (Q5); otherwise iterative deepening.  0 for CSP.  Needed for `min-steps-remaining?` to prune before a first solution.  Set it for `min-length` whenever moves can be undone (A4) |
-| `*symmetry-pruning*` | t, nil (nil) | t when Q7; staging reports the groups found, and suggests turning it off if none |
+| `*symmetry-pruning*` | t, nil (nil) | t when Q7; staging reports which families are kept, and suggests turning it off if none is detected |
 | `*threads*` | 0 = serial, N (0) | May be declared in the spec or set at the REPL. Crossing between serial and parallel requires a rebuild; changing a positive count to another positive count does not. 0 for auto-wait and problems that create objects during search |
 | `*randomize-search*` | t, nil (nil) | D1 and D3 only |
 | `*time-limit*` | seconds; 0 = none (0) | a bounded probe or run; a run stopped by it reports "stopped at the time limit" and proves nothing (D3) |
