@@ -606,21 +606,19 @@
 
 
 (defun prune-inoperative-symmetry-groups ()
-  "Keep only families whose every action use is permutation-safe, and that some action
-   parameter ranges over or that the flow check passes clean.  A single identity-sensitive
-   action use invalidates a family for global canonicalization, even when another action
-   could use that family safely."
+  "Keep only families whose every action use is permutation-safe and that the flow check
+   passes clean.  A single identity-sensitive use invalidates a family for global
+   canonicalization, even when another action could use that family safely."
   (setf *symmetry-families*
         (remove-if-not (lambda (family)
-                         (member (symmetry-family-status family)
-                                 '(:kept-clean :kept-flagged :query-only-clean)))
+                         (eq (symmetry-family-status family) :kept))
                        *symmetry-families*))
   (rebuild-symmetry-lookups))
 
 
 (defun symmetry-family-status (family)
-  "Classify FAMILY by the action-parameter checks and the flow check (report only):
-   :UNSAFE-ACTION, :KEPT-CLEAN, :KEPT-FLAGGED, :QUERY-ONLY-CLEAN or :QUERY-ONLY-FLAGGED."
+  "Classify FAMILY by the action-parameter check and the flow check: :UNSAFE-ACTION,
+   :FLAGGED (the flow check found a spot) or :KEPT."
   (let ((group (symmetry-family-objects family))
         (clean (and (null (rest (assoc family *symmetry-safety-report*)))
                     (null (rest (assoc :all *symmetry-safety-report*))))))
@@ -628,24 +626,8 @@
                        (action-uses-group-entirely-safely-p action group))
                      *actions*)
            :unsafe-action)
-          ((some (lambda (action)
-                   (action-uses-group-soundly-p action group))
-                 *actions*)
-           (if clean :kept-clean :kept-flagged))
-          (clean :query-only-clean)
-          (t :query-only-flagged))))
-
-
-(defun action-uses-group-soundly-p (action group)
-  "Returns T if ACTION has at least one kept (sound-for-pruning) parameter
-   whose declared type includes some object in GROUP."
-  (let ((kept-indices (gethash (action.name action) *symmetric-type-parameters*))
-        (non-header-types (remove-if (lambda (ptype)
-                                       (member ptype *parameter-headers*))
-                                     (action.precondition-types action))))
-    (some (lambda (idx)
-            (type-includes-group-member-p (nth idx non-header-types) group))
-          kept-indices)))
+          (clean :kept)
+          (t :flagged))))
 
 
 (defun action-group-parameter-indices (action group)
@@ -750,8 +732,8 @@
 ;;; position is checked against the boundary rule: it may pass the position on to queries
 ;;; and updates, or to other plain Lisp that does the same, and nothing else; a query
 ;;; result that may hold members, handed back into plain Lisp, is a spot as well.
-;;; Report only: families are not dropped on the check's account, except a family no
-;;; action parameter ranges over, which is kept only when the check passes it clean.
+;;; Enforcing: a family is kept only when the check finds no spot for it and no spot
+;;; affects every family; staging prints each family's verdict and spots.
 
 
 (defparameter *flow-value-operators*
@@ -2114,26 +2096,22 @@
 
 
 (defun print-symmetry-safety-report ()
-  "Print the flow check's verdict and spots for every detected family (report only)."
+  "Print the safety verdict and flow check spots for every detected family."
   (when (rest *symmetry-safety-report*)
-    (format t "~&Symmetry safety check (report only):~%")
+    (format t "~&Symmetry safety check:~%")
     (loop for (family . texts) in *symmetry-safety-report*
           unless (eq family :all)
             do (format t "  ~A: ~A~%"
                        (symmetry-family.rows family)
                        (ecase (symmetry-family-status family)
                          (:unsafe-action "dropped (an action parameter use is unsafe)")
-                         (:kept-clean "kept; passes the full check")
-                         (:kept-flagged "kept; the full check would drop it")
-                         (:query-only-clean
-                          "kept (no action parameter ranges over it); passes the full check")
-                         (:query-only-flagged
-                          "dropped (no action parameter ranges over it); the full check flags it")))
+                         (:kept "kept; passes the full check")
+                         (:flagged "dropped; the full check flags it")))
                (dolist (text texts)
                  (format t "      ~A~%" text)))
     (let ((shared (rest (assoc :all *symmetry-safety-report*))))
       (when shared
-        (format t "  Spots affecting every family:~%")
+        (format t "  Spots affecting every family (all dropped):~%")
         (dolist (text shared)
           (format t "      ~A~%" text))))))
 
@@ -2238,6 +2216,8 @@
              (format t "  Strategy: Global — symmetric states are detected as duplicates in closed list and pruned.~%")
              (format t "  Strategy: Local — symmetric actions are detected at generation time and pruned.~%")))
        (terpri))
+      ((rest *symmetry-safety-report*)
+       (format t "~2%No symmetry family passed the safety check; search runs without symmetry pruning.~2%"))
       (t
        (format t "~2%No symmetry families detected. Set *symmetry-pruning* = nil for greater efficiency.~2%"))))
   (index-symmetry-visit-domains)
