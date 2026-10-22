@@ -778,8 +778,11 @@
 
 
 (defparameter *flow-hook-names*
-  '(heuristic? prune-state? bounding-function? min-steps-remaining?)
-  "Search hooks evaluated on positions during search.")
+  '(heuristic? prune-state?)
+  "Search hooks evaluated on positions during search whose result can steer it by name.
+   The bound hooks (BOUNDING-FUNCTION?, MIN-STEPS-REMAINING? and its contributors) are not
+   checked: a bound valid for a position is valid for every renamed copy, since both are
+   equally far from the goal, so merging them cannot make a valid bound prune wrongly.")
 
 
 (defvar *flow-families* nil
@@ -943,8 +946,7 @@
 (defun flow-reach-hooks ()
   "Reach the search hooks: a hook query as spec code, a plain Lisp hook as a function
    receiving the position."
-  (dolist (name (append *flow-hook-names*
-                        (mapcar #'second *min-steps-remaining-contributors*)))
+  (dolist (name *flow-hook-names*)
     (cond ((member name *query-names*)
            (flow-reach name))
           ((gethash name *flow-lisp-definitions*)
