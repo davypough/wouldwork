@@ -700,7 +700,10 @@
 ;;; holds facts, not object order, so a renamed position yields a renamed snapshot and gets
 ;;; its own correctly computed entry: caching on one is sound under symmetry pruning.  These
 ;;; are the only engine functions the safety flow check lets receive the position
-;;; (*FLOW-ENGINE-STATE-READERS*).
+;;; (*FLOW-ENGINE-STATE-READERS*).  The object-set functions STATE-MENTIONS-OBJECTS-P and
+;;; REMOVE-STATE-FACTS-MENTIONING! (in ww-support, so spec code can call them) also take a
+;;; list of objects and use it only as a set, so a renamed position with the renamed list
+;;; gives the same answer or the renamed result (*FLOW-ENGINE-OBJECT-SET-OPERATORS*).
 
 
 (defparameter *state-projection-relations*
@@ -781,8 +784,15 @@
   "Name-free operators that apply a function argument to list elements.")
 
 
-(defparameter *flow-engine-state-readers* '(state-relations-projection)
-  "Engine functions allowed to receive the position: content-based snapshots.")
+(defparameter *flow-engine-state-readers* '(state-relations-projection problem-state.value)
+  "Engine functions allowed to receive the position: content-based snapshots, and
+   PROBLEM-STATE.VALUE, the objective value, a number that renaming objects cannot change.")
+
+
+(defparameter *flow-engine-object-set-operators*
+  '(state-mentions-objects-p remove-state-facts-mentioning!)
+  "Engine functions taking the position and a list of objects that they use only as a set.
+   They may receive both, and return no member.")
 
 
 (defparameter *flow-hook-names*
@@ -1009,8 +1019,10 @@
               (flow-bind-parameters (second form))
               (flow-walk (third form))
               nil)
-             ((assert next finally) (flow-walk-forms (rest form))
-                                    nil)
+             (assert (flow-walk-forms (rest form))
+                     nil)
+             ((next finally) (flow-walk-followup (second form))
+                             nil)
              ((ww-loop loop) (flow-walk-loop form))
              ((assign setq setf) (flow-walk-assignment form))
              ((mv-assign multiple-value-bind destructuring-bind) (flow-walk-multiple-binding form))
@@ -1029,6 +1041,15 @@
              (lambda (flow-walk-lambda form nil))
              ((funcall apply) (flow-walk-funcall form))
              (t (flow-walk-call form))))))
+
+
+(defun flow-walk-followup (form)
+  "A NEXT or FINALLY followup (FUNCTION . ARGS) runs after the effect as
+   (FUNCTION position . ARGS) -- see APPLY-FOLLOWUPS.  A query or update is reached as
+   usual; plain Lisp is checked as receiving the position."
+  (if (or (member (first form) *query-names*) (member (first form) *update-names*))
+    (flow-walk form)
+    (flow-walk (list* (first form) 'state (rest form)))))
 
 
 (defun flow-walk-call (form)
@@ -1052,7 +1073,8 @@
                                  taints)))
         ((or (member head *flow-value-operators*) (member head *flow-mapping-operators*))
          (reduce #'union taints :initial-value nil))
-        ((member head *flow-predicate-operators*)
+        ((or (member head *flow-predicate-operators*)
+             (member head *flow-engine-object-set-operators*))
          nil)
         ((member head *flow-index-operators*)
          (when (first taints)

@@ -14,21 +14,6 @@
   (recording-switched-on switch))
 
 
-(defun reset-recording-switch-shadow! (state)
-  (clear-recorder-shadow-relation! state 'recording-switched-on)
-  state)
-
-
-(defun seed-recording-switch-shadow! (state)
-  "Seed recording switch memory from the ordinary playback baseline."
-  (let* ((idb (problem-state.idb state))
-         (propositions (list-database idb)))
-    (dolist (switch (gethash 'switch *types*))
-      (when (member (list 'switched-on switch) propositions :test #'equal)
-        (add-proposition (list 'recording-switched-on switch) idb))))
-  (invalidate-problem-state-hash state))
-
-
 (define-update initialize-recording-switch-state! ()
   ;; DEFINE-INIT may seed a switch on.  Mirror that baseline only during initialization;
   ;; ordinary propagation must leave the action-controlled recording memory untouched.
@@ -40,4 +25,11 @@
 
 
 (register-recorder-shadow-lifecycle
-  'switch 'reset-recording-switch-shadow! 'seed-recording-switch-shadow!)
+  'switch
+  ;; Reset: clear the recording switch memory inherited from the preceding cycle.
+  '(doall (?switch switch)
+     (not (recording-switched-on ?switch)))
+  ;; Seed recording switch memory from the ordinary playback baseline.
+  '(doall (?switch switch)
+     (if (switched-on ?switch)
+       (recording-switched-on ?switch))))

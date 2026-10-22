@@ -95,7 +95,8 @@
 (define-test-helper corrupted-recorder-cycle-boundary ()
   (let ((state (copy-problem-state *start-state*)))
     (add-recorder-boundary-fact! state '(recorder-cycle-closed))
-    (close-recorder-cycle-state! state)
+    (funcall (symbol-function 'close-recorder-cycle-state!) state)
+    (invalidate-problem-state-hash state)
     (dolist (proposition
               '((recording-depressed cycle-plate)
                 (recording-latched cycle-plate)
@@ -132,12 +133,9 @@
 (define-test-claim recorder-cycle-boundary-policy
   (equal (recorder-cycle-goal '(always-true))
          '(and (always-true) (recorder-cycle-ended)))
-  (equal *recorder-shadow-lifecycles*
-         '((plate reset-recording-plate-shadow! seed-recording-plate-shadow!)
-           (receiver reset-recording-receiver-shadow! nil)
-           (switch reset-recording-switch-shadow! seed-recording-switch-shadow!)
-           (gate reset-recording-gate-shadow! nil)
-           (blower-drive reset-recording-blower-shadow! nil)))
+  (equal (mapcar (lambda (lifecycle) (list (first lifecycle) (not (null (third lifecycle)))))
+                 *recorder-shadow-lifecycles*)
+         '((plate t) (receiver nil) (switch t) (gate nil) (blower-drive nil)))
   (let* ((open-state (open-recorder-cycle-boundary))
          (before (list-database (problem-state.idb open-state))))
     (and (not (recorder-cycle-boundary-closed-p open-state))
@@ -172,7 +170,7 @@
       (= (problem-state.time prepared) 12.5)
       (= (problem-state.value prepared) 7.0)
       (recorder-cycle-boundary-closed-p prepared)
-      (not (recorder-state-contains-ghost-reference-p prepared))
+      (funcall (symbol-function 'recorder-closed-ghost-free) prepared)
       (not (recorder-boundary-fact-p
              prepared '(has-location ghost-agent recorder-site)))
       (not (recorder-boundary-fact-p prepared '(on ghost-agent cycle-plate)))

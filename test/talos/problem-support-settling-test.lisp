@@ -213,7 +213,7 @@
   (let ((state (settling-state '((holding live-holder live-tray)) nil)))
     (and (not (settling-query state 'recorder-cycle-boundary-safe))
          (let ((next (settling-apply state '(cancel-playback live-holder))))
-           (and (not (recorder-state-contains-ghost-reference-p next))
+           (and (funcall (symbol-function 'recorder-closed-ghost-free) next)
                 (= (settling-query next 'base 'live-connector) 0)
                 (not (settling-query next 'on 'live-connector 'live-tray)))))))
 
@@ -296,7 +296,7 @@
          (closed (settling-apply released '(stop-recorder ghost-holder))))
     (and (not (settling-query before 'recorder-cycle-boundary-safe))
          (settling-query released 'recorder-cycle-boundary-safe)
-         (not (recorder-state-contains-ghost-reference-p closed))
+         (funcall (symbol-function 'recorder-closed-ghost-free) closed)
          (settling-query closed 'on 'live-connector 'live-tray)
          (settling-query closed 'paired 'live-connector 'target)
          (settling-query closed 'active 'target))))

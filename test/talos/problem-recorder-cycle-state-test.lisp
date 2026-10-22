@@ -112,7 +112,7 @@
                                         '(has-location ghost-box second-site)))
 
       (recorder-cycle-boundary-closed-p closed-1)
-      (not (recorder-state-contains-ghost-reference-p closed-1))
+      (funcall (symbol-function 'recorder-closed-ghost-free) closed-1)
       (recorder-cycle-state-fact-p closed-1 '(latched cycle-plate))
       (recorder-cycle-state-fact-p closed-1
                                    '(recording-latched cycle-plate))
@@ -126,7 +126,7 @@
       (recorder-cycle-state-fact-p opened-2 '(latched cycle-plate))
 
       (recorder-cycle-boundary-closed-p closed-2)
-      (not (recorder-state-contains-ghost-reference-p closed-2))
+      (funcall (symbol-function 'recorder-closed-ghost-free) closed-2)
       (= (funcall (symbol-function 'recorder-cycle-count) closed-2) 2)
       (recorder-cycle-action-rejected-p
         closed-2 '(start-recorder live-agent)))))
@@ -137,7 +137,7 @@
           (recorder-cycle-apply *start-state* '(start-recorder live-agent))))
     (add-proposition '(on live-agent ghost-box) (problem-state.idb opened))
     (invalidate-problem-state-hash opened)
-    (and (recorder-cross-layer-boundary-reference-p opened)
+    (and (funcall (symbol-function 'recorder-cross-layer-dependency) opened)
          (recorder-cycle-action-rejected-p
            opened '(stop-recorder ghost-agent)))))
 
@@ -151,11 +151,11 @@
     (invalidate-problem-state-hash opened)
     (let ((closed
             (recorder-cycle-apply opened '(stop-recorder ghost-agent))))
-      (and (not (recorder-cross-layer-boundary-reference-p opened))
+      (and (not (funcall (symbol-function 'recorder-cross-layer-dependency) opened))
            (recorder-cycle-boundary-closed-p closed)
            (not (recorder-cycle-state-fact-p
                   closed '(paired live-box ghost-box)))
-           (not (recorder-state-contains-ghost-reference-p closed))))))
+           (funcall (symbol-function 'recorder-closed-ghost-free) closed)))))
 
 
 (define-test-claim recorder-cycle-requires-physical-closure
@@ -164,7 +164,7 @@
     (add-proposition '(has-location ghost-agent second-site)
                      (problem-state.idb opened))
     (invalidate-problem-state-hash opened)
-    (and (not (recorder-cycle-agents-ready-p opened))
+    (and (not (funcall (symbol-function 'recorder-cycle-agents-ready) opened))
          (recorder-cycle-action-rejected-p
            opened '(stop-recorder ghost-agent)))))
 

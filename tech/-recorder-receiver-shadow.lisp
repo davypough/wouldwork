@@ -11,7 +11,7 @@
 ;;; PROVIDES:
 ;;;   relation : recording-active
 ;;;   update   : update-recording-receiver-status!
-;;;   lifecycle: reset-recording-receiver-shadow!
+;;;   lifecycle: reset clause for recording-active
 
 (include-tech -recorder-core)
 (include-tech -beam-substrate)
@@ -28,11 +28,6 @@
   recording-active)
 
 
-(defun reset-recording-receiver-shadow! (state)
-  "Clear receiver facts inherited from the preceding recording cycle."
-  (clear-recorder-shadow-relation! state 'recording-active))
-
-
 (define-update update-recording-receiver-status! ()
   ;; Every mapped ghost observes the same recording-side environment.  Select that view
   ;; once and compute its relay lighting once, then reuse both for every receiver.
@@ -46,4 +41,7 @@
 
 
 (register-recorder-shadow-lifecycle
-  'receiver 'reset-recording-receiver-shadow!)
+  'receiver
+  ;; Reset: clear receiver facts inherited from the preceding recording cycle.
+  '(doall (?receiver receiver)
+     (not (recording-active ?receiver))))

@@ -10,7 +10,7 @@
 ;;;   relation : recording-open
 ;;;   query    : recording-shadow-gate-open override
 ;;;   update   : update-recording-gate-status!
-;;;   lifecycle: reset-recording-gate-shadow!
+;;;   lifecycle: reset clause for recording-open
 
 (include-tech -recorder-controls-shadow)
 (include-tech -recorder-jamming-shadow)
@@ -26,11 +26,6 @@
 
 (define-derived-relations
   recording-open)
-
-
-(defun reset-recording-gate-shadow! (state)
-  "Clear gate facts inherited from the preceding recording cycle."
-  (clear-recorder-shadow-relation! state 'recording-open))
 
 
 (define-query recording-shadow-gate-open (?gate)
@@ -49,4 +44,7 @@
 
 
 (register-recorder-shadow-lifecycle
-  'gate 'reset-recording-gate-shadow!)
+  'gate
+  ;; Reset: clear gate facts inherited from the preceding recording cycle.
+  '(doall (?gate gate)
+     (not (recording-open ?gate))))

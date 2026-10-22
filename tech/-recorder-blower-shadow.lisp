@@ -16,7 +16,7 @@
 ;;;   relation : recording-turning
 ;;;   query    : recording-shadow-turning override
 ;;;   update   : update-recording-blower-status!
-;;;   lifecycle: reset-recording-blower-shadow!
+;;;   lifecycle: reset clause for recording-turning
 
 (include-tech -recorder-controls-shadow)
 (include-tech -recorder-jamming-shadow)
@@ -41,11 +41,6 @@
   recording-turning)
 
 
-(defun reset-recording-blower-shadow! (state)
-  "Clear blower-drive facts inherited from the preceding recording cycle."
-  (clear-recorder-shadow-relation! state 'recording-turning))
-
-
 (define-query recording-shadow-turning (?drive)
   (and (recording-blower-drive ?drive)
        (recording-turning ?drive)))
@@ -64,4 +59,7 @@
 
 
 (register-recorder-shadow-lifecycle
-  'blower-drive 'reset-recording-blower-shadow!)
+  'blower-drive
+  ;; Reset: clear blower-drive facts inherited from the preceding recording cycle.
+  '(doall (?drive recording-blower-drive)
+     (not (recording-turning ?drive))))

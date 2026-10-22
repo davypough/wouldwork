@@ -13,7 +13,7 @@
 ;;;   relations : recording-depressed, recording-latched
 ;;;   query     : recording-plate-occupied
 ;;;   update    : update-recording-plate-status!
-;;;   lifecycle : reset-recording-plate-shadow!, seed-recording-plate-shadow!
+;;;   lifecycle : reset and seed clauses for recording-depressed and recording-latched
 
 (include-tech -recorder-core)
 (include-tech -support-occupancy)
@@ -41,30 +41,6 @@
                   (ghost-recording-object ?occupant))))))
 
 
-(defun reset-recording-plate-shadow! (state)
-  "Clear the recording plate edge state inherited from the preceding cycle."
-  (clear-recorder-shadow-relation! state 'recording-depressed)
-  (clear-recorder-shadow-relation! state 'recording-latched)
-  state)
-
-
-(defun seed-recording-plate-shadow! (state)
-  "Seed recording plate memory from the new playback baseline.
-
-The toggle value starts from the ordinary latch.  Depression starts from the active view:
-freshly forked ghosts for an open cycle, or live playback state after a stop.  The first
-propagation pass therefore cannot mistake an already occupied plate for a new edge."
-  (let* ((idb (problem-state.idb state))
-         (propositions (list-database idb)))
-    (dolist (plate (gethash 'toggle-plate *types*))
-      (when (member (list 'latched plate) propositions :test #'equal)
-        (add-proposition (list 'recording-latched plate) idb)))
-    (dolist (plate (gethash 'plate *types*))
-      (when (funcall (symbol-function 'recording-plate-occupied) state plate)
-        (add-proposition (list 'recording-depressed plate) idb))))
-  (invalidate-problem-state-hash state))
-
-
 (define-update update-recording-plate-status! ()
   ;; An open or legacy view contains mapped ghost occupants.  An explicit stopped boundary
   ;; reads live playback occupants so its seeded edge memory remains stable under the same
@@ -87,4 +63,19 @@ propagation pass therefore cannot mistake an already occupied plate for a new ed
 
 
 (register-recorder-shadow-lifecycle
-  'plate 'reset-recording-plate-shadow! 'seed-recording-plate-shadow!)
+  'plate
+  ;; Reset: clear the recording plate edge state inherited from the preceding cycle.
+  '(do (doall (?plate plate)
+         (not (recording-depressed ?plate)))
+       (doall (?plate toggle-plate)
+         (not (recording-latched ?plate))))
+  ;; Seed recording plate memory from the new playback baseline.  The toggle value starts
+  ;; from the ordinary latch.  Depression starts from the active view: freshly forked
+  ;; ghosts for an open cycle, or live playback state after a stop.  The first propagation
+  ;; pass therefore cannot mistake an already occupied plate for a new edge.
+  '(do (doall (?plate toggle-plate)
+         (if (latched ?plate)
+           (recording-latched ?plate)))
+       (doall (?plate plate)
+         (if (recording-plate-occupied ?plate)
+           (recording-depressed ?plate)))))

@@ -6,19 +6,28 @@
 ;;; markers therefore never become a committed boundary by accident.
 ;;;
 ;;; STOP-RECORDER and CANCEL-PLAYBACK perform the same normalization directly in their
-;;; successors: each removes every dynamic ghost reference, resets every capability-owned
-;;; recording shadow, seeds stateful memory from the committed live playback baseline, and
-;;; propagates consequences.
+;;; successors, through the CLOSE-RECORDER-CYCLE-STATE! followup: it removes every dynamic
+;;; ghost reference, resets every capability-owned recording shadow, seeds stateful memory
+;;; from the committed live playback baseline, and propagates consequences.
+;;; START-RECORDER's NORMALIZE-RECORDER-CYCLE-SHADOW! followup does the reset, seed and
+;;; propagation alone.  Both are spec updates installed at INIT, so they call every shadow
+;;; lifecycle registered by whichever capabilities the problem included, and the symmetry
+;;; safety check follows them like any other spec code.
 ;;; PREPARE-RECORDER-CYCLE-STATE remains the copy-preserving entry point used by guided
-;;; chaining, but delegates to that shared normalization.
+;;; chaining, and delegates to the same update.
 ;;;
 ;;; REQUIRES:
 ;;;   nested : -recorder-core (lifecycle registry); -recorder-solution
 ;;;            (RECORDER-CYCLE-ENDED); -propagation
 ;;; PROVIDES:
-;;;   queries   : recorder-cycle-boundary-safe, recorder-closed-ghost-free
-;;;   functions : recorder-cycle-goal, close-recorder-cycle-state!,
-;;;               normalize-recorder-cycle-shadow!, prepare-recorder-cycle-state
+;;;   queries   : recorder-ghost-objects, recorder-closed-ghost-free,
+;;;               recorder-cross-layer-pair, recorder-cross-layer-dependency,
+;;;               recorder-cycle-agents-ready, recorder-cycle-boundary-safe
+;;;   updates   : normalize-recorder-cycle-shadow!, close-recorder-cycle-state!
+;;;               (installed at INIT by install-recorder-cycle-updates from the
+;;;               registered shadow lifecycle clauses)
+;;;   functions : recorder-cycle-goal, recorder-cycle-boundary-closed-p,
+;;;               recorder-cycle-state-consistent-p, prepare-recorder-cycle-state
 
 (include-tech -recorder-core)
 (include-tech -recorder-solution)
@@ -27,82 +36,79 @@
 (in-package :ww)
 
 
-(defun recorder-object-side (state object)
-  "Return OBJECT's mapped recorder side, or NIL when it is fixed or unmapped."
-  (when (member object (gethash 'mobile-object *types*))
-    (cond
-      ((funcall (symbol-function 'live-recording-object) state object) :live)
-      ((funcall (symbol-function 'ghost-recording-object) state object) :ghost))))
-
-
-(defun recorder-value-contains-ghost-p (state value)
-  "Whether VALUE, including a nested list value, names a mapped ghost."
-  (if (consp value)
-    (or (recorder-value-contains-ghost-p state (car value))
-        (recorder-value-contains-ghost-p state (cdr value)))
-    (eql (recorder-object-side state value) :ghost)))
-
-
-(defun recorder-state-contains-ghost-reference-p (state)
-  "Whether STATE's dynamic database contains any reference to a mapped ghost."
-  (some (lambda (proposition)
-          (recorder-value-contains-ghost-p state (rest proposition)))
-        (list-database (problem-state.idb state))))
+(define-query recorder-ghost-objects ()
+  ;; Every mapped ghost.  RECORDING-COPY> is static, so the set is fixed for the problem.
+  (do (assign $ghosts nil)
+      (doall (?object mobile-object)
+        (if (ghost-recording-object ?object)
+          (push ?object $ghosts)))
+      $ghosts))
 
 
 (define-query recorder-closed-ghost-free ()
-  (not (recorder-state-contains-ghost-reference-p state)))
+  (not (state-mentions-objects-p state (recorder-ghost-objects))))
 
 
-(defun recorder-cross-layer-arguments-p (state arguments)
-  "Whether ARGUMENTS contain both live and ghost mapped objects."
-  (and (some (lambda (argument)
-               (eql (recorder-object-side state argument) :live))
-             arguments)
-       (some (lambda (argument)
-               (eql (recorder-object-side state argument) :ghost))
-             arguments)))
+(define-query recorder-cross-layer-pair (?object1 ?object2)
+  ;; One of the two is a mapped live object and the other a mapped ghost.
+  (and (mobile-object ?object1)
+       (mobile-object ?object2)
+       (or (and (live-recording-object ?object1)
+                (ghost-recording-object ?object2))
+           (and (ghost-recording-object ?object1)
+                (live-recording-object ?object2)))))
 
 
-(defun recorder-boundary-reference-relations ()
-  "Physical relations whose live/ghost dependencies cannot cross a disappearing boundary."
-  ;; A PAIRED link may safely disappear with its ghost endpoint; it neither supports nor
-  ;; relocates the surviving live connector.  HOLDING and ON would leave physical state
-  ;; undefined, so those dependencies must be resolved before STOP-RECORDER.  HOLDING is
-  ;; bijective and stores its facts under generated index names rather than its own, so
-  ;; those names are added too; ON is an ordinary relation and needs no such expansion.
-  (append '(holding on)
-          (copy-list (gethash 'holding *bijective-relations*))))
+(define-query recorder-cross-layer-dependency ()
+  ;; A live/ghost ON or HOLDING dependency, which a disappearing ghost would leave
+  ;; physically undefined, so it must be resolved before STOP-RECORDER.  A PAIRED link may
+  ;; safely disappear with its ghost endpoint; it neither supports nor relocates the
+  ;; surviving live connector.
+  (or (exists (?occupant support-occupant)
+        (and (bind (on ?occupant $support))
+             (recorder-cross-layer-pair ?occupant $support)))
+      (exists (?agent agent)
+        (and (bind (holding ?agent $held))
+             (recorder-cross-layer-pair ?agent $held)))))
 
 
-(defun recorder-cross-layer-boundary-reference-p (state)
-  "Whether STATE contains a live/ghost support or holding dependency."
-  (let ((relations (recorder-boundary-reference-relations)))
-    (some (lambda (proposition)
-            (and (member (first proposition) relations)
-                 (recorder-cross-layer-arguments-p state (rest proposition))))
-          (list-database (problem-state.idb state)))))
-
-
-(defun recorder-cycle-agents-ready-p (state)
-  "Whether every mapped ghost agent is at a recorder and empty-handed."
-  (every (lambda (agent)
-           (or (not (eql (recorder-object-side state agent) :ghost))
-               (and (funcall (symbol-function 'recording-agent-at-recorder)
-                             state agent)
-                    (funcall (symbol-function 'recording-agent-empty-handed)
-                             state agent))))
-         (gethash 'agent *types*)))
-
-
-(defun recorder-cycle-boundary-safe-p (state)
-  "Whether an open cycle can close without preserving a cross-layer dependency."
-  (and (recorder-cycle-agents-ready-p state)
-       (not (recorder-cross-layer-boundary-reference-p state))))
+(define-query recorder-cycle-agents-ready ()
+  ;; Every mapped ghost agent is at a recorder and empty-handed.
+  (forall (?agent agent)
+    (or (not (ghost-recording-object ?agent))
+        (and (recording-agent-at-recorder ?agent)
+             (recording-agent-empty-handed ?agent)))))
 
 
 (define-query recorder-cycle-boundary-safe ()
-  (recorder-cycle-boundary-safe-p state))
+  ;; An open cycle can close without preserving a cross-layer dependency.
+  (and (recorder-cycle-agents-ready)
+       (not (recorder-cross-layer-dependency))))
+
+
+(define-problem-helper install-recorder-cycle-updates ()
+  "Install NORMALIZE-RECORDER-CYCLE-SHADOW! and CLOSE-RECORDER-CYCLE-STATE! as spec code
+   splicing in every registered shadow lifecycle clause: all resets, then all seeds, in
+   registration order, then propagation.  A propagation that fails to converge marks the
+   state inconsistent itself.  Closing first removes every fact naming a mapped ghost, and
+   marks the state inconsistent if propagation brings a ghost reference back.  Deferred to
+   INIT because capabilities register their lifecycles from files spliced after this one.
+   Installed only here, never by DEFINE-UPDATE: a zero-argument technology update is a
+   propagation driver candidate, and these are followups that call the driver."
+  (install-update 'normalize-recorder-cycle-shadow!
+                  nil
+                  `(do ,@(mapcar #'second *recorder-shadow-lifecycles*)
+                       ,@(remove nil (mapcar #'third *recorder-shadow-lifecycles*))
+                       (propagate-changes!)))
+  (install-update 'close-recorder-cycle-state!
+                  nil
+                  '(do (remove-state-facts-mentioning! state (recorder-ghost-objects))
+                       (normalize-recorder-cycle-shadow!)
+                       (if (not (recorder-closed-ghost-free))
+                         (inconsistent-state)))))
+
+
+(register-deferred-action-installer 'install-recorder-cycle-updates)
 
 
 (defun recorder-cycle-goal (subgoal)
@@ -116,52 +122,10 @@
   (funcall (symbol-function 'recorder-cycle-ended) state))
 
 
-(defun reset-recorder-cycle-shadow! (state)
-  "Run every capability-owned reset callback against STATE."
-  (dolist (lifecycle *recorder-shadow-lifecycles* state)
-    (funcall (symbol-function (second lifecycle)) state)))
-
-
-(defun seed-recorder-cycle-shadow! (state)
-  "Run every capability-owned seed callback against STATE."
-  (dolist (lifecycle *recorder-shadow-lifecycles* state)
-    (when (third lifecycle)
-      (funcall (symbol-function (third lifecycle)) state))))
-
-
 (defun recorder-cycle-state-consistent-p (state)
-  "Normalize STATE and report whether propagation converged without inconsistency."
+  "Propagate STATE and report whether propagation converged without inconsistency."
   (and (funcall (symbol-function 'propagate-changes!) state)
        (not (state-is-inconsistent state))))
-
-
-(defun normalize-recorder-cycle-shadow! (state)
-  "Reset, seed, and propagate every recording shadow in STATE."
-  (reset-recorder-cycle-shadow! state)
-  (seed-recorder-cycle-shadow! state)
-  (unless (recorder-cycle-state-consistent-p state)
-    (add-proposition '(inconsistent-state) (problem-state.idb state))
-    (invalidate-problem-state-hash state))
-  state)
-
-
-(defun remove-recorder-ghost-state! (state)
-  "Remove every dynamic proposition that refers to a mapped ghost."
-  (let ((idb (problem-state.idb state)))
-    (dolist (proposition (list-database idb))
-      (when (recorder-value-contains-ghost-p state (rest proposition))
-        (delete-proposition proposition idb))))
-  (invalidate-problem-state-hash state))
-
-
-(defun close-recorder-cycle-state! (state)
-  "Remove ended or cancelled ghosts and normalize the recording view from live state."
-  (remove-recorder-ghost-state! state)
-  (normalize-recorder-cycle-shadow! state)
-  (when (recorder-state-contains-ghost-reference-p state)
-    (add-proposition '(inconsistent-state) (problem-state.idb state))
-    (invalidate-problem-state-hash state))
-  state)
 
 
 (defun prepare-recorder-cycle-state (boundary-state)
@@ -173,7 +137,8 @@ ghost reference."
   (unless (recorder-cycle-boundary-closed-p boundary-state)
     (error "Recorder cycle boundary was not produced by STOP-RECORDER or CANCEL-PLAYBACK."))
   (let ((prepared-state (copy-problem-state boundary-state)))
-    (close-recorder-cycle-state! prepared-state)
+    (funcall (symbol-function 'close-recorder-cycle-state!) prepared-state)
+    (invalidate-problem-state-hash prepared-state)
     (when (state-is-inconsistent prepared-state)
       (error "Recorder cycle shadow did not propagate to a consistent state."))
     (unless (recorder-cycle-boundary-closed-p prepared-state)

@@ -1,7 +1,8 @@
 ;;; Filename: -support-motion.lisp
 ;;; Shared support geometry, dependency traversal, relocation, and physical landing.
 ;;; ON and held-tray dependencies move together. Selection policy remains with callers:
-;;; blower landings retain first-match/exact-height behavior; settling uses highest-below.
+;;; blower landings take the first qualifying support category with an exact-height option,
+;;; settling uses highest-below, and both signal an error on an ambiguous tie.
 ;;; MOUNTED-ON is a soft dependency guarded by optional FAN, as in -placement.
 
 (include-tech -vertical)
@@ -74,18 +75,36 @@
         do (has-location $object ?destination))))
 
 (define-query landing-support (?location location ?self support-occupant ?required-elevation)
-  ;; Preserve blower support kinds, category order, and exact-height contract.
-  (do (assign $landing nil)
+  ;; The qualifying support in the first category, in PHYSICAL-SUPPORTS-AT's order (plates,
+  ;; mounted fans, fixed blowers, boxes), at exactly ?REQUIRED-ELEVATION when one is given.
+  ;; Two qualifying supports in that category leave the landing undetermined -- the model
+  ;; does not say which one the object reaches, and the choice can change the outcome --
+  ;; so signal an error, as SETTLING-SUPPORT does.
+  (do (assign $landings nil)
+      (assign $category nil)
       (assign $surfaces (physical-supports-at ?location nil))
       (ww-loop for $surface in $surfaces
-        do (if (and (not $landing)
+        do (if (and (or (not $category)
+                        (eql (landing-support-category $surface) $category))
                     (not (support-dependent-p $surface ?self nil))
                     (cleartop $surface ?self)
                     (support-use-allowed ?self $surface)
                     (or (not ?required-elevation)
                         (eql (top $surface) ?required-elevation)))
-             (assign $landing $surface)))
-      $landing))
+             (do (assign $category (landing-support-category $surface))
+                 (push $surface $landings))))
+      (if (rest $landings)
+        (error "Ambiguous landing for ~S at ~S: ~S"
+               ?self ?location (reverse $landings)))
+      (first $landings)))
+
+
+(define-query landing-support-category (?surface)
+  ;; The PHYSICAL-SUPPORTS-AT category of a landing surface.
+  (cond ((plate ?surface) 'plate)
+        ((fan ?surface) 'fan)
+        ((box ?surface) 'box)
+        (t 'fixed-blower)))
 
 (define-problem-helper normalize-support-rider-locations (state)
   "Predecessor-leaf normalizer: give every object resting ON a support, and every held
@@ -134,9 +153,9 @@
 
 (define-update land-on-support!
     (?base support-occupant ?destination location ?required-elevation)
-  ;; Rest ?base, already moved to ?destination by relocate-stack!, on the first
-  ;; landing-support match there (excluding ?base itself), or leave it resting on bare
-  ;; ground (relocate-stack!'s default) if none matches.
+  ;; Rest ?base, already moved to ?destination by relocate-stack!, on the landing-support
+  ;; match there (excluding ?base itself), or leave it resting on bare ground
+  ;; (relocate-stack!'s default) if none matches.  An ambiguous match is an error.
   (do (assign $support (landing-support ?destination ?base ?required-elevation))
       (if $support
         (on ?base $support))))

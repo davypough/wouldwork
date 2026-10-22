@@ -248,6 +248,7 @@
                     '(not (recorder-cycle-stopped-by-ghost)))))
     (invalidate-problem-state-hash copy)
     (relay-view-call 'close-recorder-cycle-state! copy)
+    (invalidate-problem-state-hash copy)
     copy))
 
 

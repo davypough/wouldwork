@@ -92,7 +92,7 @@
   ;; object on its destination's landing-support match constrained to the destination's
   ;; own floor elevation (a plate, or a floor-mounted fan) -- a box's raised top never
   ;; matches, so it is never landed on here -- or leaves it on bare ground if none is
-  ;; flush.  A fan is zero-thickness, so no fan (loose or mounted) is ever struck;
+  ;; flush; two flush matches of the same kind are an error.  A fan is zero-thickness, so no fan (loose or mounted) is ever struck;
   ;; occupants standing below or above the stream stay put.  An armed gun (or other
   ;; threat) at the destination is not this file's concern: -threat's
   ;; enforce-threat-safety! backstop drops the whole resulting state if the sweep lands

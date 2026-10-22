@@ -123,7 +123,7 @@
         (funcall (symbol-function 'recorder-cycle-ended) cancelled)
         (not (funcall (symbol-function 'ghost-stops-recorder) cancelled))
         (= (funcall (symbol-function 'recorder-cycle-count) cancelled) 1)
-        (not (recorder-state-contains-ghost-reference-p cancelled))
+        (funcall (symbol-function 'recorder-closed-ghost-free) cancelled)
         (recorder-cancel-fact-p cancelled '(has-location live-agent recorder-site))
         (recorder-cancel-fact-p cancelled '(has-location live-box away-site))
         (not (recorder-cancel-fact-p cancelled '(on live-box ghost-box)))

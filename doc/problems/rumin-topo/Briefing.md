@@ -387,7 +387,7 @@ is open; cycle 1 remains open. All 37 actions are accepted.
 SG6 (A proposal; D agreed 2026-10-01): close cycle 1 while retaining
 the live blue chain, box1 and tray1 placements. Ghost agent1* releases its empty
 tray locally, walks location2 -> location3, then stops the recorder. Live agent1
-stays at location4. CONSISTENT with recorder-cycle-boundary-safe-p: STOP needs
+stays at location4. CONSISTENT with recorder-cycle-boundary-safe: STOP needs
 all ghosts at the recorder, empty-handed, with no cross-layer ON/HOLDING.
 Ghost removal should not remove any component of the current live beam or
 plate2 keeper. NEEDS full replay of closure and separate recorder validation.

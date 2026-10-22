@@ -15,13 +15,13 @@
 ;;; standing between pad and destination (no obstacle-clear/passability check is
 ;;; modeled for it -- the whole point of the arc is that it flies over what a horizontal
 ;;; stream could not), and once the object lands it stays landed, even if the gears later
-;;; stop turning or the fan is lifted away.  land-on-support! rests it on the first
+;;; stop turning or the fan is lifted away.  land-on-support! rests it on the
 ;;; landing-support match at the destination -- a plate, a floor-mounted fan, or a box,
 ;;; at whatever height its top happens to be, since an arc (unlike wall-blower's flush
 ;;; horizontal delivery) can terminate at any elevation -- or on bare ground if none is
-;;; clear.  If that support is itself a fan mounted on turning gears, the object is
-;;; launched onward in a later propagation pass: blowers chain automatically through the
-;;; shared fixpoint.
+;;; clear; two qualifying supports of the first matching kind are an error.  If that
+;;; support is itself a fan mounted on turning gears, the object is launched onward in a
+;;; later propagation pass: blowers chain automatically through the shared fixpoint.
 ;;; A jamming jammer or a paired connector stays jamming/paired through the ride; its
 ;;; effect is re-derived by propagation from wherever it lands, never retracted here.
 ;;; Only another fan is too flat to catch the stream: it is merely toppled off the fan's

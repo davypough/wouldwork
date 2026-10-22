@@ -491,6 +491,47 @@
                     (del-prop prop db int-db))))))))
 
 
+(defun state-mentions-objects-p (state objects)
+  "Whether any of STATE's facts names one of OBJECTS, as an argument or inside a fluent
+   value.  OBJECTS is used only as a set, so the answer is the same under any renaming of
+   interchangeable objects (an allowed engine call in the symmetry safety check)."
+  (block search
+    (maphash (lambda (key value)
+               (when (tree-mentions-objects-p
+                       (rest (if (eql value t)
+                               (convert-to-proposition key)
+                               (convert-to-fluent-proposition key value)))
+                       objects)
+                 (return-from search t)))
+             (problem-state.idb state))
+    nil))
+
+
+(defun remove-state-facts-mentioning! (state objects)
+  "Delete every fact of STATE that names one of OBJECTS, as an argument or inside a fluent
+   value."
+  (let ((idb (problem-state.idb state))
+        (doomed nil))
+    (maphash (lambda (key value)
+               (let ((proposition (if (eql value t)
+                                    (convert-to-proposition key)
+                                    (convert-to-fluent-proposition key value))))
+                 (when (tree-mentions-objects-p (rest proposition) objects)
+                   (push proposition doomed))))
+             idb)
+    (dolist (proposition doomed)
+      (delete-proposition proposition idb)))
+  (invalidate-problem-state-hash state))
+
+
+(defun tree-mentions-objects-p (tree objects)
+  "Whether TREE names one of OBJECTS at any depth."
+  (if (consp tree)
+    (or (tree-mentions-objects-p (car tree) objects)
+        (tree-mentions-objects-p (cdr tree) objects))
+    (and tree (member tree objects :test #'eq) t)))
+
+
 (defun generate-new-propositions (vars propositions idxs)
   "Collects new propositions for each prop in propositions."
   (loop for prop in propositions

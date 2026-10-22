@@ -45,8 +45,7 @@
 ;;;              overrides recording-shadow-object, recording-shadow-object-present,
 ;;;              object-manipulation-allowed, support-use-allowed,
 ;;;              support-occupancy-conflict-p, and connector-pairing-allowed
-;;;   functions: register-recorder-shadow-lifecycle,
-;;;              clear-recorder-shadow-relation!
+;;;   function : register-recorder-shadow-lifecycle
 
 (include-tech -location)
 (include-tech -holding)
@@ -113,31 +112,25 @@
 
 
 (defvar *recorder-shadow-lifecycles* nil
-  "Registered (COMPONENT RESETTER SEEDER) callbacks in component assembly order.")
+  "Registered (COMPONENT RESET-CLAUSE SEED-CLAUSE) contributions in component assembly
+   order.  Each clause is an unevaluated effect form, or NIL for no seed, spliced into
+   -recorder-cycle-boundary's installed cycle updates.")
 
 ;; A staged recorder problem reloads this file in the same Lisp image.  Clear registrations
 ;; from the preceding problem before this recorder assembly registers its own components.
 (setf *recorder-shadow-lifecycles* nil)
 
 
-(defun register-recorder-shadow-lifecycle (component resetter &optional seeder)
-  "Register COMPONENT's reset callback and optional seed callback for cycle preparation."
+(defun register-recorder-shadow-lifecycle (component reset-clause &optional seed-clause)
+  "Register COMPONENT's reset clause and optional seed clause for cycle preparation."
   (reject-worker-read-write 'register-recorder-shadow-lifecycle)
   (when (assoc component *recorder-shadow-lifecycles*)
     (error "Recorder shadow lifecycle registered twice for ~S." component))
   (setf *recorder-shadow-lifecycles*
         (append *recorder-shadow-lifecycles*
-                (list (list component resetter seeder))))
+                (list (list component reset-clause seed-clause))))
   component)
 
-
-(defun clear-recorder-shadow-relation! (state relation)
-  "Remove every proposition for RELATION from STATE's dynamic database."
-  (let ((idb (problem-state.idb state)))
-    (dolist (proposition (list-database idb))
-      (when (eql (first proposition) relation)
-        (delete-proposition proposition idb))))
-  (invalidate-problem-state-hash state))
 
 
 (define-query live-recording-object (?object mobile-object)
