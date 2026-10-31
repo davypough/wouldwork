@@ -253,7 +253,6 @@
    (register-dynamic-object $new-beam 'beam)
    ;; Now $new-beam can be safely used in propositions like:
    ;; (beam-segment $new-beam ?source ?target $x $y)"
-  (declare (type symbol object type-name))
   ;; Input validation
   (reject-worker-read-write 'register-dynamic-object)
   (check-type object symbol "a symbol")
