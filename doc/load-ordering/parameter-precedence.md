@@ -108,7 +108,9 @@ concern managed `ww-set` settings; ordinary technology `defparameter` forms run 
 
 ## What `ww-set` does, by parameter
 
-`ww-set` (`ww-set.lisp`) is a macro. Its first act is `(unless (and *refreshing* *ww-loading*) ...)`
+`ww-set` (`ww-set.lisp`) selects the parameter's branch during macro expansion, emitting
+only the code for that setting. Validation remains at execution time because some checks
+depend on current settings. The generated code first checks `(unless (and *refreshing* *ww-loading*) ...)`
 — so during a `(refresh)`, every `ww-set` form in the problem file is skipped entirely, which is how
 refresh preserves what you set at the REPL. Its second act is `check-problem-parameter`
 (`ww-validator.lisp`), which rejects out-of-range values before anything is assigned.
