@@ -1,0 +1,73 @@
+PROBLEM / REVISION / AUTHORIZED SCOPE
+  Active record: doc/problems/intersect/spec-analysis.txt.
+  Specification: probs/problem-intersect.lisp (new), revision 1 in progress.
+  Scope approved by user 2026-11-05: draft the spec section by section; read tech sources
+  (gate, plate, beam-relay, beam-crossing, walkability, visibility, reachability, ladder,
+  elevation if needed) and probs/problem-rumin-topo.lisp as a coordinate-geometry pattern;
+  assistant-run staging and fidelity checks in the Linux VM (each well under 15 min);
+  one bounded smoke search, depth cutoff 10 (user may revise by search time), *threads* 16.
+  Windows-only confirmations handed to the user as REPL sequences.
+
+INPUT ANALYSIS AND OBJECTIVE
+  doc/problems/intersect/problem-analysis.txt, revision 3 (2026-11-05).
+  Preserved snapshot: problem-analysis-2026-11-04-before-spec.txt (rev 2; until wrap-up).
+  Rev 3 corrections (user): L2 -> (21,6); L8 removed; LD1 climbs L3 -> L2.  Agreed.
+
+REPRESENTATION AND AUTHORING APPROACH
+  Path B (tech library) with coordinate-derived geometry, as in rumin-topo (D6).
+  Stored state: agent location, held connector, connector locations, paired links (D1).
+  Derived by tech: relay colors, crossing activity, receiver activity, gate open, plate
+  depressed.
+  Semantic settings: planning, min-length, graph, *max-connector-pairings* 3.
+  Provisional: *depth-cutoff* 10; *threads* 16 set at the REPL, not in the file.
+  Source findings (2026-11-05):
+  - gate.lisp: controls are DNF (OR of AND-lists); G4 = ((receiver4 plate1)) normal.
+  - walkability nests -elevation; elevation tech need not be included separately.
+  - beam-crossing must be included explicitly (rumin-topo does not use it).
+  - reach passes windows exactly as sight does (-reachability-coordinates).  User rule
+    (2026-11-05): no reach through any window.  Every derived reach edge across a window
+    gets REACH-DISALLOWED>; the exact pairs are measured after staging.
+
+SECTION REVIEW AND REQUIREMENT MAPPING
+  1 Representation and settings: written and reviewed 2026-11-05 (user added the
+    no-reach-through-windows rule).
+  2 Objects and fixed geometry: written 2026-11-05; user said continue.
+  3-6 Tech includes, start state, init action, goal: written 2026-11-05 (combined,
+    small and dependent); awaiting user review.
+
+CHECKS AND EVIDENCE
+  1. Staging, cloud container (SBCL 2.2.9, Ubuntu), 2026-11-05, assistant-run.
+     (Linux VM route refused by the session's permission check.)
+     Spec as written: FAILS in ESTABLISH-BEAM-COORDINATES:
+       "Beam (TRANSMITTER2 LOCATION1) has multiple crossings at parameter 23/33."
+     Cause (deduction + second run): collinear points.  L3 (24,8), L5 (4,8), R4r (0.1,8)
+     share y=8, and T1b, L1, L4, R3b share x=15, so overlapping candidate beams (e.g.
+     L3-R4r and L3-L5) are crossed by a third beam at one point.  -beam-crossing-
+     coordinates (beam-coordinates-crossings-on-beam) rejects two crossings at the
+     same parameter on one beam.
+     Copy-only trials: L5 -> (4,17/2) alone still fails (x=15 line); L1 -> (61/4,5),
+     L4 -> (61/4,16), L5 -> (4,33/4) stages cleanly (STAGED-OK, no init-check failure;
+     ladder climb L3->L2 accepted).  1/4 offsets keep each location within the 1/2-unit
+     occlusion distance of the line it left.  User files unchanged.
+     Decision (user, 2026-11-05): fix the tech instead of shifting locations -- let
+     crossings at the same point be checked independently.  Plan: project doc
+     claude/beam-crossing-ties-plan.md, to be done in a separate session.
+     Tie fix done (2026-11-05, cloud SBCL 2.2.9): crossings at the same point on a beam
+     are recorded pairwise as CROSSINGS-COINCIDE> and never block each other in
+     BEAM-REACHES-CROSSING.  Spec with original coordinates (L1 (15,5), L4 (15,16),
+     L5 (4,8)) now STAGES cleanly: 284 crossings, 58 coincident pairs, all from
+     overlapping beams on the y=8 and x=15 lines.  (test-topo) and the six
+     beam-crossing test problems pass.
+
+READINESS AND OPEN ISSUES
+  Open: list of window reach edges to disallow (candidates by deduction: L3-L2 via WIN1,
+  L4-L2 via WIN2, L5/L6-L2 via WIN4+WIN3; confirm by measurement); whether the agent
+  depresses P1;
+  *threads* 16 compatibility.
+
+HANDOFF AND NEXT STEP
+  Tie fix done; spec stages with the original coordinates.  Next: measure and disallow
+  window reach edges, review sections 3-6, fidelity checks, smoke search at depth 10.
+
+CORRECTIONS AND HISTORY
+  None.

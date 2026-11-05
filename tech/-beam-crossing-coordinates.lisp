@@ -30,6 +30,10 @@
 ;;; beam-crossing.lisp derives that itself, lazily, from whichever facts populate CROSSINGS-
 ;;; ALONG-BEAM>, regardless of how they got there.
 ;;;
+;;; Crossings at the same point on a beam (collinear grid points, or three or more beams
+;;; concurrent at one point) are listed in arbitrary but deterministic order and recorded
+;;; pairwise as CROSSINGS-COINCIDE>, so BEAM-REACHES-CROSSING never lets one block another.
+;;;
 ;;; Also derives BEAM-CROSSINGS-BEFORE-GATE> (declared by beam-crossing.lisp, alongside
 ;;; CROSSINGS-ALONG-BEAM>) when the problem asserts GATE-SEGMENT>: DERIVE-BEAM-CROSSINGS-BEFORE-GATE
 ;;; splits each gate-conditioned beam's crossing set at that gate's own crossing parameter on
@@ -49,7 +53,7 @@
 ;;; REQUIRES:
 ;;;   nested    : -beam-los-coordinates (LOS-ENDPOINT type; APPARATUS-COORDS>, LOCATION-
 ;;;               COORDS>; LOS-VIA, hand-authored or derived)
-;;;   relations : crossings-along-beam>, beam-crossings-before-gate>  --  declared by
+;;;   relations : crossings-along-beam>, beam-crossings-before-gate>, crossings-coincide>  --  declared by
 ;;;               beam-crossing.lisp itself, the parent tech this file is always nested under
 ;;; PROVIDES:
 ;;;   nested    : -beam-los-coordinates
@@ -129,19 +133,31 @@
 
 
 (defun beam-coordinates-crossings-on-beam (beam records)
-  (let ((parameter&crossing
-          (loop for record in records
-                when (equal beam (second record))
-                  collect (cons (third record) (first record))
-                when (equal beam (fourth record))
-                  collect (cons (fifth record) (first record)))))
-    (setf parameter&crossing (sort parameter&crossing #'< :key #'car))
-    (loop for (left right) on parameter&crossing
-          while right
-          when (= (car left) (car right))
-            do (error "Beam ~A has multiple crossings at parameter ~A."
-                      beam (car left)))
-    (mapcar #'cdr parameter&crossing)))
+  ;; BEAM's crossings in increasing parameter order.  Crossings at the same parameter (the
+  ;; same point) keep their record order; BEAM-COORDINATES-COINCIDENT-CROSSING-PAIRS marks
+  ;; them so BEAM-REACHES-CROSSING never lets one block another.
+  (mapcar #'cdr (stable-sort (beam-coordinates-parameter&crossings beam records) #'< :key #'car)))
+
+
+(defun beam-coordinates-coincident-crossing-pairs (beams records)
+  ;; Every (crossing1 crossing2) pair at the same parameter on a shared beam -- the same
+  ;; point.  Two beams meet at most once, so a coincident pair shares exactly one beam and
+  ;; is collected once.  Three beams concurrent at one point yield all three pairs.
+  (loop for beam in beams
+        append (loop for remaining on (beam-coordinates-parameter&crossings beam records)
+                     append (loop for other in (rest remaining)
+                                  when (= (car (first remaining)) (car other))
+                                    collect (list (cdr (first remaining)) (cdr other))))))
+
+
+(defun beam-coordinates-parameter&crossings (beam records)
+  ;; (parameter . crossing) for each of BEAM's crossings, in record order, from records of
+  ;; shape (crossing beam1 parameter1 beam2 parameter2).
+  (loop for record in records
+        when (equal beam (second record))
+          collect (cons (third record) (first record))
+        when (equal beam (fourth record))
+          collect (cons (fifth record) (first record))))
 
 
 (defun beam-coordinates-split-crossings-at-parameter (beam records split-parameter)
@@ -157,12 +173,7 @@
   ;; not multiple values, for the same CHECK-VARIABLE-NAMES reason noted on BEAM-
   ;; COORDINATES-LOS-OCCLUDERS above.
   (let ((parameter&crossing
-          (loop for record in records
-                when (equal beam (second record))
-                  collect (cons (third record) (first record))
-                when (equal beam (fourth record))
-                  collect (cons (fifth record) (first record)))))
-    (setf parameter&crossing (sort parameter&crossing #'< :key #'car))
+          (sort (beam-coordinates-parameter&crossings beam records) #'< :key #'car)))
     (cons (mapcar #'cdr (remove-if-not (lambda (pc) (< (car pc) split-parameter)) parameter&crossing))
           (mapcar #'cdr (reverse (remove-if-not (lambda (pc) (> (car pc) split-parameter)) parameter&crossing))))))
 
@@ -238,7 +249,7 @@
   ;; BEAM> directly) is entirely unaffected.  Computes every proper beam intersection from
   ;; the authored sightlines (LOS-VIA) and coordinates, mints
   ;; one crossing per intersection, publishes the pool as CURRENT-BEAM-CROSSINGS, and asserts
-  ;; CROSSINGS-ALONG-BEAM> accordingly.  CURRENT-BEAM-CROSSINGS is asserted before the
+  ;; CROSSINGS-ALONG-BEAM> and CROSSINGS-COINCIDE> accordingly.  CURRENT-BEAM-CROSSINGS is asserted before the
   ;; per-beam loop below purely for readability; nothing in this effect reads it back, but
   ;; DERIVE-BEAM-CROSSINGS-BEFORE-GATE does, and beam-crossing.lisp's GET-CURRENT-BEAM-CROSSINGS
   ;; reads it for every DOALL over crossings from here on.  Does not assert BEAM-CROSSING> --
@@ -265,6 +276,9 @@
                 (beam-coordinates-derive-crossing-records $beams $positions))
         (assign $beam-crossings (mapcar #'first $records))
         (current-beam-crossings $beam-crossings)
+        (ww-loop for $pair in (beam-coordinates-coincident-crossing-pairs $beams $records)
+                 do (crossings-coincide> (first $pair) (second $pair))
+                    (crossings-coincide> (second $pair) (first $pair)))
         (ww-loop for $beam in $beams
                  do (assign $beam-crossings
                             (beam-coordinates-crossings-on-beam $beam $records))

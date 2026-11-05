@@ -36,7 +36,7 @@
 ;;;               beam-relay, etc.) independently declare their own transmitter-alias
 ;;;               for their own pre-params; the bare and aliased forms resolve compatibly
 ;;;   relations : crossing-active, beam-crossing>, crossings-along-beam>,
-;;;               beam-crossings-before-gate>, current-beam-crossings
+;;;               beam-crossings-before-gate>, crossings-coincide>, current-beam-crossings
 ;;;   queries   : get-current-beam-crossings, current-crossing-set, beam-reaches-crossing,
 ;;;               compute-active-beam-crossings, arbitrate-beam-crossings, crossing-reaches,
 ;;;               crossing-priority, beam-source-distance, same-crossing-set,
@@ -67,6 +67,7 @@
   (beam-crossing> crossing $los-endpoint $los-endpoint $los-endpoint $los-endpoint)
   (crossings-along-beam> los-endpoint $list los-endpoint)
   (beam-crossings-before-gate> los-endpoint $list gate los-endpoint)
+  (crossings-coincide> crossing crossing)  ;same point on a shared beam, asserted both ways
   (current-beam-crossings $list))  ;the crossing pool itself, in crossing1, crossing2, ... order
 
 
@@ -147,6 +148,8 @@
      ?lighting)
   ;; Resolve the live orientation first.  Fixed direct beams are live only in their
   ;; natural transmitter -> receiver orientation; relay beams are supplied by beam-relay.
+  ;; An active crossing earlier on the beam blocks ?xing unless the two coincide: crossings
+  ;; at the same point never block each other.
   (do (assign $reaches nil)
       (assign $src nil)
       (assign $dst nil)
@@ -169,7 +172,8 @@
                        do (if (eql $e ?xing)
                             (assign $reached t)
                             (if (and (not $reached)
-                                     (member $e ?active))
+                                     (member $e ?active)
+                                     (not (crossings-coincide> $e ?xing)))
                               (assign $blocked t)))))
             (if (not $blocked)
               (assign $reaches t))))
