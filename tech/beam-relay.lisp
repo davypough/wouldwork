@@ -17,8 +17,10 @@
 ;;;                and hooks); -placement; -visibility (null defaults); -vertical (top);
 ;;;                -mobility; -reachability; -pickup; -beam-relay-init-checks;
 ;;;                -recorder-fork-registry (paired-fact fork)
-;;;   parameter  : *max-connector-pairings* -- defaults to 3; connector pairings only; fixed
-;;;                couplings are unlimited; a problem may set a smaller value first
+;;;   parameter  : *max-connector-pairings* -- defaults to 3; at most that many PAIRED links per
+;;;                connector at any time, counting links on both sides and links retained
+;;;                through a pickup; fixed couplings are unlimited; a problem may set a
+;;;                smaller value first
 ;;;   driver     : propagate-consequences! must call
 ;;;                  update-relay-status! -> update-receiver-status!
 ;;; PROVIDES:
@@ -33,7 +35,7 @@
 ;;;                relay-link-clear, relay-link-clear-for-object,
 ;;;                paired-relay-visible, paired-relay-visible-for-object,
 ;;;                relay-beam-live-for-cutting, beam-relay-source-distance,
-;;;                connectable-location, connectable-terminus
+;;;                connectable-location, connectable-terminus, connector-link-count
 ;;;   updates    : update-relay-status!
 ;;;   actions    : pickup-connector, pickup-connector-retaining-pairings,
 ;;;                put-connector, connect-connector
@@ -164,6 +166,9 @@
   (?agent agent ?location location)
   (and (bind (holding ?agent $connector))
        (connector $connector)
+       (assign $link-room
+               (- *max-connector-pairings* (connector-link-count $connector)))
+       (> $link-room 0)
        (bind (has-location ?agent $a-location))
        (reachable ?location $a-location)
        (connectable-location $connector ?location)
@@ -179,7 +184,7 @@
               ?agent $pairing-vantages ?location $connector ?terminus)
           (assign $connectable (cons ?terminus $connectable))))
       (ww-loop for $selected-termini in
-                 (rest (subsets-up-to $connectable *max-connector-pairings*))
+                 (rest (subsets-up-to $connectable $link-room))
                do (ww-loop for $placement-option in $places
                            do (assert
                                 (assign $termini $selected-termini)
@@ -466,7 +471,13 @@
      ?terminus terminus)
   ;; Pairing selection uses structural LOS from any currently traversable vantage.  Exact
   ;; placement and live visibility subsequently determine whether the beam carries color.
+  ;; A terminus already linked to the connector, either direction, is not offered again,
+  ;; and a connector terminus must have room under *max-connector-pairings*.
   (and (connector-pairing-allowed ?agent ?connector ?terminus)
+       (not (paired ?connector ?terminus))
+       (or (not (connector ?terminus))
+           (and (not (paired ?terminus ?connector))
+                (< (connector-link-count ?terminus) *max-connector-pairings*)))
        (ww-loop for $vantage in ?pairing-vantages
                 thereis
                   (or (and (or (transmitter ?terminus)
@@ -478,3 +489,15 @@
                            (bind (has-location ?terminus $terminus-location))
                            (different ?placement-location $terminus-location)
                            (potentially-visible $vantage $terminus-location))))))
+
+
+(define-query connector-link-count (?connector connector)
+  ;; Every PAIRED fact naming the connector, on either side.  Retained links count.
+  (do (assign $count 0)
+      (doall (?terminus terminus)
+        (if (paired ?connector ?terminus)
+          (assign $count (1+ $count))))
+      (doall (?other connector)
+        (if (paired ?other ?connector)
+          (assign $count (1+ $count))))
+      $count))

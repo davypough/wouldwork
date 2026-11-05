@@ -21,11 +21,12 @@
 
 
 (define-init-check-helper check-init-paired-consistency (literals)
-  "Checks basic consistency of initial connector pairings."
+  "Checks basic consistency of initial connector pairings, counting links on both sides."
   (when (init-connector-paired-relation-p)
     (let ((locations (init-literal-map 'has-location literals 1 2))
-          (pair-counts (make-hash-table :test #'equal)))
-      (dolist (literal (positive-init-literals-with-relation 'paired literals))
+          (pair-counts (make-hash-table :test #'equal))
+          (paired-literals (positive-init-literals-with-relation 'paired literals)))
+      (dolist (literal paired-literals)
         (destructuring-bind (connector terminus)
             (rest (init-literal-proposition literal))
           (unless (gethash connector locations)
@@ -44,12 +45,23 @@
                     Literal: ~S~%~
                     Target:  ~S"
                    literal terminus))
-          (incf (gethash connector pair-counts 0))))
+          (when (find-if (lambda (other)
+                           (equal (rest (init-literal-proposition other))
+                                  (list terminus connector)))
+                         paired-literals)
+            (fail-init-check nil "~%PAIRED link is stored in both directions.~%~
+                    Literal:   ~S~%~
+                    Connector: ~S~%~
+                    Target:    ~S"
+                   literal connector terminus))
+          (incf (gethash connector pair-counts 0))
+          (when (init-type-member-p terminus 'connector)
+            (incf (gethash terminus pair-counts 0)))))
       (maphash (lambda (connector count)
                  (when (> count *max-connector-pairings*)
                    (fail-init-check nil "~%PAIRED connector exceeds *MAX-CONNECTOR-PAIRINGS*.~%~
                            Connector: ~S~%~
-                           Pairings:  ~D~%~
+                           Links:     ~D~%~
                            Limit:     ~D"
                           connector count *max-connector-pairings*)))
                pair-counts))))

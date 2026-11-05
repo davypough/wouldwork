@@ -5,7 +5,7 @@ PROBLEM / REVISION / AUTHORIZED SCOPE
   (gate, plate, beam-relay, beam-crossing, walkability, visibility, reachability, ladder,
   elevation if needed) and probs/problem-rumin-topo.lisp as a coordinate-geometry pattern;
   assistant-run staging and fidelity checks in the Linux VM (each well under 15 min);
-  one bounded smoke search, depth cutoff 10 (user may revise by search time), *threads* 16.
+  one bounded smoke search, depth cutoff 10, revised by user to 7 (2026-11-05), *threads* 16.
   Windows-only confirmations handed to the user as REPL sequences.
 
 INPUT ANALYSIS AND OBJECTIVE
@@ -19,7 +19,7 @@ REPRESENTATION AND AUTHORING APPROACH
   Derived by tech: relay colors, crossing activity, receiver activity, gate open, plate
   depressed.
   Semantic settings: planning, min-length, graph, *max-connector-pairings* 3.
-  Provisional: *depth-cutoff* 10; *threads* 16 set at the REPL, not in the file.
+  Provisional: *depth-cutoff* 7 (user, was 10); *threads* 16 set at the REPL, not in the file.
   Source findings (2026-11-05):
   - gate.lisp: controls are DNF (OR of AND-lists); G4 = ((receiver4 plate1)) normal.
   - walkability nests -elevation; elevation tech need not be included separately.
@@ -29,11 +29,28 @@ REPRESENTATION AND AUTHORING APPROACH
     gets REACH-DISALLOWED>; the exact pairs are measured after staging.
 
 SECTION REVIEW AND REQUIREMENT MAPPING
-  1 Representation and settings: written and reviewed 2026-11-05 (user added the
-    no-reach-through-windows rule).
-  2 Objects and fixed geometry: written 2026-11-05; user said continue.
-  3-6 Tech includes, start state, init action, goal: written 2026-11-05 (combined,
-    small and dependent); awaiting user review.
+  1 Representation and settings: written 2026-11-05; described, code not shown.
+    User added the no-reach-through-windows rule.
+  2 Objects and fixed geometry: written 2026-11-05; described, code not shown.
+  3-6 Tech includes (step added after check 3d), start state (C2 at L2, C3 at L3 per
+    user), init action, goal: written 2026-11-05; code not shown.
+  All sections to be presented for user approval on resuming (user, 2026-11-05).
+
+ENHANCEMENTS FOR THE LARGER FAMILY  (agenda agreed by user 2026-11-05)
+  E1 Connector symmetry pruning: (ww-set *symmetry-pruning* t).  Growth: number of
+     connectors.  Premise: C1-C3 identical (no distinguishing static facts, not in the
+     goal).  Merges states differing only by connector names; drops only solutions that
+     differ by renaming.  Implemented and enabled.  Staging safety check: family
+     (connector1 connector2 connector3) kept, passes the full check.  (audit-symmetry),
+     depth 7, *threads* 16: on and off both exhausted-no-solution, 75,285 states each,
+     0 symmetry duplicates.  Depth 7 never produces two connectors in swapped places, so
+     the benefit is unmeasured (search-advisor question).
+  E2 min-steps-remaining? placeholder: 0 at location7, else 1.  Sound (at least one move
+     remains).  Implemented and enabled; exercised in item 8 (2,204 evaluations, 0
+     prunes, as expected for a cutoff-only search).  Stronger bound (closed gates on the
+     forced route, topo-lower-bound per D8): search-advisor question.
+  Deferred to the search advisor, not implemented: omit retaining pickup (D3);
+  connect-connector branching measurement at the cap of 3.
 
 CHECKS AND EVIDENCE
   1. Staging, cloud container (SBCL 2.2.9, Ubuntu), 2026-11-05, assistant-run.
@@ -58,16 +75,102 @@ CHECKS AND EVIDENCE
      L5 (4,8)) now STAGES cleanly: 284 crossings, 58 coincident pairs, all from
      overlapping beams on the y=8 and x=15 lines.  (test-topo) and the six
      beam-crossing test problems pass.
+  2. Derived geometry, original coordinates, cloud SBCL 2.2.9, 2026-11-05, assistant-run.
+     Walking pairs (TRAVERSE-VIA) match the agreed areas and gate order exactly.
+     No REACH-VIA facts at all: *horizontal-reach-limit* is 5/2 and the closest
+     location pair (L5-L6) is about 3.2 apart, so no reach crosses a window and no
+     REACH-DISALLOWED> is needed (one that suppressed nothing would be an error).
+  3. Fidelity checks by replay (validate-action-sequence), 2026-11-05, assistant-run.
+     Start variants exist only in the throwaway copy (problem-intersect-va/vb/vc).
+     a. From the real start: pickup C1, connect C1 at L1 to (receiver1 transmitter1):
+        C1 blue, R1b active, gate1 open; only move offered is walk L1 -(gate1)-> L2.
+        The agent standing at the relay's location does not occlude its beams.
+     b. Agent empty-handed at L3: only move is the ladder climb to L2.  Holding C2 at
+        L3: no moves.  At L2 after the climb (gates closed): no moves, so no descent.
+     c. C3 put on plate1 at L6 with R4r inactive: plate1 depressed, gate4 closed.
+     d. Agent at L6 could NOT press plate1 (no step move).  Fix: (include-tech step)
+        added to the spec.  After it: step onto plate1 offered; standing on it gives
+        (depressed plate1); from the plate the only move is stepping back off.
+     e. Crossing: C1 at L1 linked T1b, R1b, C3; C3 at L4 linked R3b; C2 at L3 linked
+        T2r, R4r.  Result: crossing193 active = (L1-L4) x (L3-R4r) at (15,8); C3
+        unlit, R3b and R4r inactive; C1 blue, C2 red, R1b active, gate1 open.  Both
+        crossing beams cut.  The L1-L4 beam's later crossing with T2r-L3 is not
+        reached, so the T2r-L3 hop stays live (C2 red), as intended.
+  4. Smoke search, cloud container (2 cores), 2026-11-05, assistant-run.  Spec with
+     step tech; graph, min-length, *depth-cutoff* 10, *threads* 16.
+     Completed normally in 19.5 s, during task generation: 480 distinct states, max depth
+     explored 8 (< cutoff), 17,856 states processed, 97.3% repeats, average branching
+     37.2.  3,488 successor states abandoned as inconsistent.  No solutions found.
+     Reading: the whole state space reachable under the model is 480 states and the goal
+     is not among them, so depth is not the limit.  Either a fidelity gap (possibly
+     hidden in the abandoned states) or the puzzle needs something not modelled.
+     Inconsistent-state sources in the included tech: placement-choice-allowed
+     (-placement), the propagation fixpoint cap (-propagation), the beam-crossing
+     fixpoint/arbitration (beam-crossing), threat safety (-threat).  Not yet identified.
+  5. Inconsistent-state diagnosis, 2026-11-05, assistant-run (tech copies instrumented
+     in the throwaway copy only; user tech files unchanged).
+     All 4,920 abandoned states (sequential run) come from the propagation fixpoint cap
+     (-propagation, 10 passes): an oscillation, not placement, crossing or threat.
+     From the first connect at L1 exactly one of 92 successors is dropped: C1 linked to
+     (T1b T2r R1b).  Loop: T2r reaches L1 only through gate1; with both hues C1 is unlit
+     -> R1b off -> gate1 closes -> red cut -> C1 blue -> R1b on -> gate1 opens -> ...
+     All other drops are the same loop with extra links (via retaining pickup).  These are
+     physically unstable configurations; dropping them hides no stable state.
+     Side observation: retaining pickup followed by a new connect can leave C1 with more
+     than 3 links (up to 6 seen).  Whether retained links count toward the cap of 3 is a
+     rule question for the user, deferred (one issue at a time).
+  6. Reachable-space census (own breadth-first walk with generate-children), 2026-11-05.
+     480 states, depths 0-7.  Facts ever true: gate1 and gate3 open, R1b and R3b
+     active, C1 blue, agent at L1 or L2 only; C1 only ever at L1 or held; C2 and C3
+     never move.  Reason: gate1 is open only while C1 stays at L1 relaying T1b -> R1b,
+     so the agent enters the central room empty-handed, with no connector to send T2r's
+     red to R2r; gate2 can never open.  (L1-L2 is 6.1 apart, beyond the 5/2 reach limit,
+     so C1 cannot be picked up through gate1 from L2.)
+     Superseded by the user's start corrections below: C2 starts at L2, C3 at L3.
+  7. Smoke search after start corrections (C2 at L2, C3 at L3; analysis rev 3 addenda),
+     cloud container (2 cores), 2026-11-05, assistant-run, *threads* 16.
+     Depth 10: still searching after about 15 min (711 tasks generated at depths 0-5);
+     stopped.  User reduced *depth-cutoff* to 7.
+     Depth 7: completed normally in 37.3 s; 75,285 states processed, 91.3% repeats,
+     4,351 depth-cutoff hits, average branching 34.2, 4,082 inconsistent states
+     abandoned (same oscillation mechanism as item 5, not re-diagnosed), no errors,
+     no solution within 7 steps.  Bounded smoke check: passed (operation, not a
+     solution or a benchmark).
+  8. Combined check with E1 and E2 enabled, depth 7, *threads* 16, 2026-11-05: completed
+     normally in 43.1 s; 75,285 states, 4,078 inconsistent abandoned, no solution.
+     Staging prints "caught 6 WARNING conditions" from engine files (undefined
+     variables *closed-shards*, *closed-shard-locks*, *first-solution-found* in
+     ww-parallel-infrastructure.lisp) under the cloud SBCL 2.2.9 load -- engine/
+     environment, not the spec; to be confirmed on Windows at final review.
+  9. Connector link cap (tech change, claude/connector-link-cap-plan.md), cloud SBCL
+     2.2.9, 2026-11-05, assistant-run.  Tech now caps every link naming a connector
+     (both sides, retained links included) at *max-connector-pairings*.  Replays from
+     the real start: C1 held retaining 2 links (R1b T1b) is offered only single-terminus
+     connects, never an already-linked terminus, each leaving C1 at 3 links; C1 held
+     retaining 3 links is offered no connect-connector (put-connector only).  Throwaway
+     variants (problem-intersect-1/-2, copy only): C3 with 2 links (one incoming from C2)
+     is still offered as a terminus; with 3 links it is never offered.
+     (report-symmetry-safety): connector family kept, passes the full check.
+     (test-topo) passes.  (test-talos): 126 of 128 pass, 0 of 26 mutants survive;
+     beam-crossing-ties-test passes rerun alone (its failure was a staging collision
+     with a concurrent replay); beam-relay-test passes rerun alone after its
+     final-state connectable-terminus checks were updated for the no-re-link rule.
+     A full (test-talos) on Windows is the remaining confirmation.
 
 READINESS AND OPEN ISSUES
-  Open: list of window reach edges to disallow (candidates by deduction: L3-L2 via WIN1,
-  L4-L2 via WIN2, L5/L6-L2 via WIN4+WIN3; confirm by measurement); whether the agent
-  depresses P1;
-  *threads* 16 compatibility.
+  Resolved: window reach (none derived, item 2); agent presses P1 via step tech (item 3d);
+  *threads* 16 runs (items 4, 7, 8); C2/C3 start corrections (item 7); connector link
+  cap (item 9).
+  Open: not yet shown to the user: the spec code.
 
 HANDOFF AND NEXT STEP
-  Tie fix done; spec stages with the original coordinates.  Next: measure and disallow
-  window reach edges, review sections 3-6, fidelity checks, smoke search at depth 10.
+  Step 4 done (E1, E2).  Rule answered (user, 2026-11-05): a connector has at most 3
+  links at any time, counting links it made and links made to it by other connectors;
+  retained links (optional on pickup) still count.  Tech change done and tested
+  (item 9); the earlier 3,488/4,082 inconsistent-state counts predate it.
+  Process correction (user, 2026-11-05): the spec code has not been shown.  On resuming,
+  present sections 1-6 and E1, E2 for approval one at a time; each section is approved
+  as written before its testing begins.  Then step 5 final review.
 
 CORRECTIONS AND HISTORY
   None.

@@ -3181,15 +3181,20 @@
                                   (relay-view-hop-blockers state selector near near-top far far-top))))))))
 
 (defun relay-view-pairing-reason (state connector mappings)
-  "Outgoing pairings are owned selections; incoming links do not use that capacity."
+  "Every link naming CONNECTOR counts against capacity; the links it stores are the ones
+   checked for self-pairing and recording-side dependency."
   (let* ((facts (database state))
          (pairs (remove-if-not (lambda (fact)
                                 (and (eq (first fact) 'paired)
                                      (eq (second fact) connector))) facts))
+         (links (count-if (lambda (fact)
+                            (and (eq (first fact) 'paired)
+                                 (or (eq (second fact) connector)
+                                     (eq (third fact) connector)))) facts))
          (ghost (find connector mappings :key #'third))
          (live (find connector mappings :key #'second)))
     (cond
-      ((> (length pairs) *max-connector-pairings*) "outgoing pairing capacity exceeded")
+      ((> links *max-connector-pairings*) "link capacity exceeded")
       ((some (lambda (pair) (eq (third pair) connector)) pairs) "connector paired to itself")
       ((some (lambda (pair)
                (let ((target (third pair)))
@@ -4343,7 +4348,7 @@ counted as layer-blind roots."
 
 (defun report-relay-light-pools ()
   "Capacity, and the transmitter, receiver, connector and repeater pools."
-  (format t "    capacity: ~D outgoing pairings per connector (*max-connector-pairings*); incoming links unlimited~%"
+  (format t "    capacity: ~D links per connector (*max-connector-pairings*), stored or incoming, retained links included~%"
           *max-connector-pairings*)
   (format t "    transmitters by hue: ~:[none~;~:*~{~A~^; ~}~]~%"
           (mapcar (lambda (group) (format nil "~(~A~) ~(~{~A~^, ~}~)" (first group) (rest group)))
@@ -4363,7 +4368,7 @@ counted as layer-blind roots."
 
 
 (defun report-relay-light-start-links ()
-  "Each connector's outgoing pairings against capacity and its incoming links, at the start."
+  "Each connector's links against capacity, split into stored and incoming, at the start."
   (let ((pairings (relay-light-pairings (crossing-state-facts *start-state*))))
     (format t "    start-state links (~D stored pairings)~:[: none~;~]~%" (length pairings) pairings)
     (when pairings
@@ -4371,8 +4376,8 @@ counted as layer-blind roots."
         (let ((outgoing (mapcar #'second (remove-if-not (lambda (pair) (eq (first pair) connector)) pairings)))
               (incoming (mapcar #'first (remove-if-not (lambda (pair) (eq (second pair) connector)) pairings))))
           (when (or outgoing incoming)
-            (format t "      ~(~A~): outgoing ~D/~D ~(~S~); incoming ~(~S~)~%" connector
-                    (length outgoing) *max-connector-pairings* outgoing incoming)))))))
+            (format t "      ~(~A~): links ~D/~D; outgoing ~(~S~); incoming ~(~S~)~%" connector
+                    (+ (length outgoing) (length incoming)) *max-connector-pairings* outgoing incoming)))))))
 
 
 (defun relay-light-station-feeds (station endpoint-links)
@@ -4595,12 +4600,14 @@ counted as layer-blind roots."
 
 
 (defun relay-light-capacity (state)
-  "Per connector: (CONNECTOR OUTGOING INCOMING OVER-CAPACITY-P), counts of stored links."
+  "Per connector: (CONNECTOR OUTGOING INCOMING OVER-CAPACITY-P), counts of stored links;
+   capacity applies to their sum."
   (let ((pairings (relay-light-pairings (crossing-state-facts state))))
     (loop for connector in (census-type-instances 'connector)
           for outgoing = (count connector pairings :key #'first)
-          collect (list connector outgoing (count connector pairings :key #'second)
-                        (> outgoing *max-connector-pairings*)))))
+          for incoming = (count connector pairings :key #'second)
+          collect (list connector outgoing incoming
+                        (> (+ outgoing incoming) *max-connector-pairings*)))))
 
 
 (defun relay-light-feeder (state selector receiver relay records)
@@ -4784,10 +4791,11 @@ counted as layer-blind roots."
                 (getf result :lighting-agreement) (getf result :color-agreement)
                 (getf result :receiver-agreement))
         (report-relay-light-relays result)
-        (format t "  connector capacity (outgoing/capacity, incoming):~%")
+        (format t "  connector capacity (links/capacity: outgoing + incoming):~%")
         (dolist (entry (getf result :capacity))
-          (format t "    ~(~A~): ~D/~D, incoming ~D~:[~;  OVER CAPACITY~]~%" (first entry) (second entry)
-                  *max-connector-pairings* (third entry) (fourth entry)))
+          (format t "    ~(~A~): ~D/~D (~D + ~D)~:[~;  OVER CAPACITY~]~%" (first entry)
+                  (+ (second entry) (third entry)) *max-connector-pairings*
+                  (second entry) (third entry) (fourth entry)))
         (report-relay-light-receivers result)
         (report-relay-light-chains result)
         (format t "  For this state only: not reachability, not stability beyond the fixed-point check, and no claim that separately evaluated colors compose.~%")))
@@ -4820,8 +4828,8 @@ counted as layer-blind roots."
      "BEAM-VIA present; recorded walls/edges/boundaries and closed gates clear at interpolated endpoint heights; unrecorded authored gates open; authored location occupants not spanning beam height. Views may differ; other beam mechanisms can activate the receiver")
     ("beam-relay" :contract "also S6 RC; RL scenario" report-beam-relay-instances
      "the derived COLOR of every relay (connector or repeater), recomputed in each propagation after the crossing set, and each receiver's ACTIVE fact (RECORDING-ACTIVE in the recording view)"
-     "connectors only: PICKUP-CONNECTOR lifts one and deletes every PAIRED fact it owns and every one naming it; PICKUP-CONNECTOR-RETAINING-PAIRINGS keeps them, but a held connector has no location and neither receives nor sends a beam; PUT-CONNECTOR places without pairing; CONNECT-CONNECTOR places the held connector at a location the agent reaches and stores 1 to *max-connector-pairings* outgoing PAIRED facts, to termini structurally visible from any location the agent can walk to, never to a connector at the placement location"
-     "lighting runs in propagation layers from every transmitter (layer 0). A relay settles in the first layer in which any clear link from a lit source reaches it: one hue lights it; two or more hues in that layer leave it dark, and a dark relay feeds nothing; a hue arriving in a later layer is ignored. A connector is also dark when a connector at its location is already lit. Clear link: a stored PAIRED fact in either direction (COUPLED for fixed apparatus), a live sightline in the reading view, and no cut by an active crossing (physical view only). Pairings persist while their beam is blocked or cut; only pickup clears them. Capacity counts a connector's outgoing pairings; incoming links are unlimited. A receiver is reached only by a relay of its hue whose own outgoing pairing (or coupling) names it, visible and uncut; beam-direct may reach it independently. CONNECT-CONNECTOR needs no lit connector of the same recorder layer at the placement location. Layers are propagation order, not travel time or action order")
+     "connectors only: PICKUP-CONNECTOR lifts one and deletes every PAIRED fact it owns and every one naming it; PICKUP-CONNECTOR-RETAINING-PAIRINGS keeps them, but a held connector has no location and neither receives nor sends a beam; PUT-CONNECTOR places without pairing; CONNECT-CONNECTOR places the held connector at a location the agent reaches and stores PAIRED facts to 1 or more termini, never past *max-connector-pairings* links on the connector or on a connector terminus (links on both sides and retained links count), and never to a terminus it is already linked to, to termini structurally visible from any location the agent can walk to, never to a connector at the placement location"
+     "lighting runs in propagation layers from every transmitter (layer 0). A relay settles in the first layer in which any clear link from a lit source reaches it: one hue lights it; two or more hues in that layer leave it dark, and a dark relay feeds nothing; a hue arriving in a later layer is ignored. A connector is also dark when a connector at its location is already lit. Clear link: a stored PAIRED fact in either direction (COUPLED for fixed apparatus), a live sightline in the reading view, and no cut by an active crossing (physical view only). Pairings persist while their beam is blocked or cut; only pickup clears them. Capacity counts every link naming a connector, either direction, retained links included. A receiver is reached only by a relay of its hue whose own outgoing pairing (or coupling) names it, visible and uncut; beam-direct may reach it independently. CONNECT-CONNECTOR needs no lit connector of the same recorder layer at the placement location. Layers are propagation order, not travel time or action order")
     ("box" :extractors "S2 S5")
     ("elevation" :infrastructure "authors levels; read by S5")
     ("floor-blower" :contract "also S1" report-floor-blower-instances

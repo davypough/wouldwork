@@ -39,7 +39,7 @@
 
 (ww-set *symmetry-pruning* t)
 
-(ww-set *max-connector-pairings* 3)  ;max termini a connector may pair in one connect (beam-relay's connect-connector)
+(ww-set *max-connector-pairings* 3)  ;max links per connector at any time, either direction (beam-relay)
 
 
 ;;;; TYPES ;;;;

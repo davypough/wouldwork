@@ -12,7 +12,8 @@
 ;;;      sites occupied only by unlit connectors.
 ;;;   5. CONNECTABLE-TERMINUS using structural visibility: a transmitter behind a closed
 ;;;      gate is eligible for pairing but not live visibility.  A no-LOS transmitter, the
-;;;      connector itself, and a connector already at the placement location are rejected.
+;;;      connector itself, a connector already at the placement location, and a terminus
+;;;      the connector is already linked to are rejected.
 ;;;
 ;;; Initial state: lifecycle-connector rests on old-plate at origin, paired outward to
 ;;; old-source and named inward by incoming-connector; placement-connector is held by
@@ -192,10 +193,11 @@
     (potentially-visible origin decoy-source)
     (not (visible origin decoy-source))
     (not (open closed-gate))
-    (connectable-terminus
-      relay-agent '(origin) target lifecycle-connector new-source)
-    (connectable-terminus
-      relay-agent '(origin) target lifecycle-connector new-receiver)
+    ;; NEW-SOURCE and NEW-RECEIVER are already linked here, so they are not offered again.
+    (not (connectable-terminus
+           relay-agent '(origin) target lifecycle-connector new-source))
+    (not (connectable-terminus
+           relay-agent '(origin) target lifecycle-connector new-receiver))
     (connectable-terminus
       relay-agent '(origin) target lifecycle-connector decoy-source)
     (not (connectable-terminus

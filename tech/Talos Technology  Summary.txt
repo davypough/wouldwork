@@ -197,4 +197,4 @@ Technology-owned default (DEFPARAMETER after INCLUDE-TECH to override):
 
 Managed problem parameters (WW-SET, restored on staging):
 *max-recorder-cycles* 1  ;maximum START-RECORDER actions in one planner path, or NIL for no limit; a cycle counts when it starts
-*max-connector-pairings* 3  ;tech/beam-relay.lisp; max PAIRED termini a connector may hold at once; connector pairings only -- fixed COUPLED corridors are unlimited; a problem may set a smaller value first
+*max-connector-pairings* 3  ;tech/beam-relay.lisp; max PAIRED links a connector may have at any time, counting links on both sides and links retained through a pickup; connector pairings only -- fixed COUPLED corridors are unlimited; a problem may set a smaller value first

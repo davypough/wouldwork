@@ -32,7 +32,7 @@ AGREED PROBLEM DESCRIPTION  (agreed by user 2026-11-04)
     R3b (15,19.9) S; R4r (0.1,8) E.
   Controls (gate open only while condition holds): G1<-R1b; G2<-R2r; G3<-R3b;
     G4<-R4r AND P1.  P1 pressed by agent or a connector at L6.
-  Start: agent1 at L1; C1 at L1; C2 at L3; C3 at L5; gates closed; connectors unlit,
+  Start: agent1 at L1; C1 at L1; C2 at L2; C3 at L3; gates closed; connectors unlit,
     no links.
   Goal: agent1 at L7.
 
@@ -48,6 +48,8 @@ INTENDED RULES AND EXAMPLES
   - LD1 climb L3->L2 only, only when empty-handed.  Allowed: empty agent at L3 climbs to L2.
     Forbidden: agent holding a connector climbs; any descent L2->L3.
   - Agent carries one connector.  Pickup either drops links or keeps them (game option).
+  - A connector has at most 3 links at any time, counting links it made and links other
+    connectors made to it; links kept through a pickup still count.  (User, 2026-11-05.)
   - Connect: place held connector and link to 1-3 termini (transmitters, receivers, other
     connectors) structurally visible from any currently walkable location.
   - Connector takes the hue reaching it; two hues in the same layer -> unlit.
@@ -63,8 +65,8 @@ STRUCTURE AND GROWTH
   Structural fact (deduction from layout): the only agent route into L7 is
   L1 -G1-> central -G2-> east -G3-> west/north -G4-> L7.  LD1 only returns the agent
   from east to central.  Every plan therefore passes G1, G2, G3, G4 in that order, each
-  open at its time of passage.  C2 is unreachable before G2 is first opened; C3 before
-  G3 is first opened.
+  open at its time of passage.  C2 (at L2) is unreachable before G1 is first opened; C3 (at L3)
+  before G2 is first opened.
   Size: 1 agent, 3 connectors, 7 locations, 6 apparatus, 4 gates, 1 plate, 1 ladder.
   History irrelevant to future legality: state fully determines continuations.
   Growth: connect branching = reachable locations x link subsets (92 for 8 termini, cap 3);
@@ -133,7 +135,7 @@ VALIDATION PLAN
 HINTS FOR DOWNSTREAM ADVISORS
   - Gate order G1 -> G2 -> G3 -> G4 is forced (deduction); natural milestones and a
     minimum plan length.  Unverified as a solution route.
-  - C2 and C3 become available only after G2 and G3 respectively; LD1 allows return to
+  - C2 and C3 become available only after G1 and G2 respectively; LD1 allows return to
     the central room empty-handed only.
 
 AGREEMENT AND HANDOFF
@@ -150,3 +152,6 @@ CORRECTIONS
     room; L8 removed; LD1 now climbs L3 -> L2 (one way, empty-handed).  Area membership
     and the forced gate order G1 -> G2 -> G3 -> G4 are unchanged.  Locations now L1-L7.
   - Rev 3 addendum (user, 2026-11-05): windows bar reach as well as walking.
+  - Rev 3 addendum (user, 2026-11-05): C2 starts at L2, not L3.
+  - Rev 3 addendum (user, 2026-11-05): C3 starts at L3, not L5.
+  - Rev 3 addendum (user, 2026-11-05): link cap of 3 is per connector, total, at any time.

@@ -15,7 +15,8 @@
 (ww-set *tree-or-graph* graph)
 (ww-set *progress-reporting-interval* 1000000)
 (ww-set *max-connector-pairings* 3)
-(ww-set *depth-cutoff* 10)
+(ww-set *symmetry-pruning* t)  ;connectors are interchangeable
+(ww-set *depth-cutoff* 7)
 
 
 ;;; Diagram names -> spec names:  Ln -> locationn;  wn -> walln;  WINn -> windown;
@@ -38,6 +39,7 @@
 
 (include-tech gate)
 (include-tech plate)
+(include-tech step)  ;agent can step onto plate1
 (include-tech ladder)
 (include-tech beam-relay)
 (include-tech beam-crossing)
@@ -53,8 +55,8 @@
   ;; Movable objects: everything starts unlinked
   (has-location agent1 location1)
   (has-location connector1 location1)
-  (has-location connector2 location3)
-  (has-location connector3 location5)
+  (has-location connector2 location2)
+  (has-location connector3 location3)
 
   ;; Fixed-position objects
   (has-position plate1 location6)
@@ -132,6 +134,17 @@
   ()
   (assert (propagate-changes!))
 )
+
+
+;;;; SEARCH HOOKS ;;;;
+
+
+;;; Placeholder estimate of steps still needed, never too high: at least one move
+;;; while the agent is not yet at location7.  A stronger bound is a search-advisor question.
+(define-query min-steps-remaining? ()
+  (if (has-location agent1 location7)
+    0
+    1))
 
 
 ;;;; GOAL ;;;;
