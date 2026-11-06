@@ -54,7 +54,8 @@
     (move agent1 ((walk location2 (gate1) location4)))
     (move agent1 ((step (location4 ground) nil (location4 blower1))))
     (toggle-switch agent1 switch1)
-    (connect-connector > agent1 connects connector1 on box1 to (repeater1 receiver1) at location5)
+    (select-termini > agent1 selects (repeater1 receiver1) for connector1 at location20)
+    (put-connector > agent1 puts connector1 on box1 at location5)
     (toggle-switch agent1 switch1)
     ;; ghost carries the load into location12 and stands on plate5
     (move agent1* ((walk location5 (gate3 gate5) location12)))
@@ -82,7 +83,8 @@
     (put-tray agent1* tray1* plate1 location2)
     (pickup-connector agent1* connector1* location2)
     (move agent1* ((walk location2 (gate1 gate3) location9)))
-    (connect-connector > agent1* connects connector1* on ground to (repeater1 transmitter1) at location9)
+    (select-termini > agent1* selects (repeater1 transmitter1) for connector1* at location9)
+    (put-connector > agent1* puts connector1* on ground at location9)
     (move agent1* ((walk location9 nil location10)))
     (move agent1* ((step (location10 ground) nil (location10 plate3))))
     ;; agent1 enters the plate room and sets the plates

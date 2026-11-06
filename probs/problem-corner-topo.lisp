@@ -35,7 +35,7 @@
 
 (ww-set *tree-or-graph* graph)
 
-(ww-set *depth-cutoff* 15)
+(ww-set *depth-cutoff* 19)  ;old 15-step plan = 19 steps with select-termini + put-connector
 
 (ww-set *symmetry-pruning* t)
 
@@ -83,10 +83,11 @@
 
 
 (include-tech gate)                  ;controls; energized; update-gate-status!
-(include-tech beam-relay)            ;paired; color; pickup/put/connect connector actions
+(include-tech beam-relay)            ;paired; selected; color; pickup/select-termini/put connector actions
 (include-tech beam-crossing)         ;crossing-active; beam-crossing>; crossings-along-beam>; apparatus-coords>
 (include-tech walkability)          ;walking mode; mobility-results; traversable; one-step-walkable; move
 (include-tech visibility)            ;los-via; visible; visible-clear
+(include-tech topo-lower-bound)      ;admissible finite-resource bound (search pruning)
 
 
 ;;;; INITIALIZATION ;;;;

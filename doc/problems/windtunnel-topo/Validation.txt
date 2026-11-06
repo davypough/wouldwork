@@ -1,4 +1,4 @@
-;;; windtunnel-topo -- complete validated solution, 17 actions.
+;;; windtunnel-topo -- complete validated solution, 19 actions.
 ;;; SUCCESS-P T; GOAL-CHECKED-P T; GOAL-SATISFIED-P T; solution validators accepted
 ;;; To re-validate: (stage windtunnel-topo), then evaluate this form separately.
 (validate-solution :verbose
@@ -8,20 +8,22 @@
   (4 (move agent1* ((step (location2 ground) nil (location2 plate1)))))
   (5 (move agent1* ((step (location2 plate1) nil (location2 ground)))))
   (6 (pickup-connector agent1 connector1 location1))
-  (7 (connect-connector agent1 connector1 ground (repeater1 transmitter1) location1))
-  (8 (move agent1 ((walk location1 nil location2))))
-  (9 (move agent1 ((step (location2 ground) nil (location2 plate1)))))
-  (10 (move agent1 ((step (location2 plate1) nil (location2 ground)))))
-  (11 (move agent1 ((walk location2 (blower1) location3))))
-  (12 (move agent1 ((walk location3 (blower1) location4))))
-  (13 (move agent1* ((step (location2 ground) nil (location2 plate1)))))
-  (14 (move agent1* ((step (location2 plate1) nil (location2 ground)))))
-  (15 (move agent1* ((walk location2 (blower1) location3))))
-  (16 (connect-connector agent1* connector1* ground (repeater1 receiver1) location3))
-  (17 (move agent1 ((walk location4 (gate2) location5)))))
+  (7 (select-termini agent1 (repeater1 transmitter1) connector1 location1))
+  (8 (put-connector agent1 connector1 ground location1))
+  (9 (move agent1 ((walk location1 nil location2))))
+  (10 (move agent1 ((step (location2 ground) nil (location2 plate1)))))
+  (11 (move agent1 ((step (location2 plate1) nil (location2 ground)))))
+  (12 (move agent1 ((walk location2 (blower1) location3))))
+  (13 (move agent1 ((walk location3 (blower1) location4))))
+  (14 (move agent1* ((step (location2 ground) nil (location2 plate1)))))
+  (15 (move agent1* ((step (location2 plate1) nil (location2 ground)))))
+  (16 (move agent1* ((walk location2 (blower1) location3))))
+  (17 (select-termini agent1* (repeater1 receiver1) connector1* location3))
+  (18 (put-connector agent1* connector1* ground location3))
+  (19 (move agent1 ((walk location4 (gate2) location5)))))
 
 Final state:
-  Time: 17.0
+  Time: 19.0
   Value: 0.0
   Propositions:
     (ACTIVE RECEIVER1)
@@ -36,9 +38,9 @@ Final state:
     (LATCHED PLATE1)
     (OPEN GATE1)
     (OPEN GATE2)
-    (PAIRED CONNECTOR1* REPEATER1)
     (PAIRED CONNECTOR1 REPEATER1)
     (PAIRED CONNECTOR1 TRANSMITTER1)
+    (PAIRED CONNECTOR1* REPEATER1)
     (PAIRED CONNECTOR1* RECEIVER1)
     (RECORDER-CYCLES-USED 1)
     (RECORDING-IN-PROGRESS)

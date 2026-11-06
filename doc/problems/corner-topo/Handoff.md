@@ -1,5 +1,31 @@
 # corner-topo — Handoff
-Updated 2026-09-30.  Status: CLOSED (full path validated).
+Updated 2026-11-06.  Status: UNSOLVABLE under the connector link cap (*max-connector-pairings* 3,
+incoming links counted, 2026-11-05).  The 15-step Actions.lisp below predates the cap and the
+select-termini/put-connector split; it no longer replays (fails at step 13) and is kept as history.
+
+## Unsolvable under the cap (2026-11-06)
+The last walk to location4 needs gate1 open (receiver1 red); after it only location4 can change.
+- End state must have gate1 closed (with receiver1 red, every blue route to receiver3 crosses
+  receiver1's feed).  That leaves (A) connector at location2 {transmitter2, receiver3} blue and
+  connector at location3 {transmitter1, receiver2} red, or (B) blue via location1 -> location2
+  with the same red, all three connectors east.  A location4 connector can only be fed from
+  location3, and location3 -> location4 cuts location2 -> receiver3.
+- The walk setup keeps the end state's east links, so receiver1 must be linked in it.  In A, on
+  the location2 connector it needs a 4th link; on the location3 connector, location3 -> receiver1
+  cuts transmitter2 -> location2 once location4's cutter is gone.  In B, location3 -> receiver1
+  cuts location1 -> location2.
+- Engine-confirmed by two replays from the start: adding connector3 at location3
+  {receiver2 receiver1 transmitter1} activates CROSSING8 against connector2 at location2
+  {receiver3 transmitter2} (connector2 dark, receiver3 off), and CROSSING35 against
+  connector1 at location1 {transmitter2} -> connector2 at location2 {connector1 receiver3}
+  (connector2 dark, receiver3 off).
+- Search (16 threads, min-length, depth 19, topo-lower-bound): out of memory at 312 s,
+  52.5M states, no solution.  Consistent with the argument, not a proof.
+Spec changes: *depth-cutoff* 15 -> 19, (include-tech topo-lower-bound) added.
+Details: project doc claude/connector-selection-plan.md, Phase 4b.
+
+## Before the cap (history)
+Status 2026-09-30: CLOSED (full path validated).
 Note (2026-10-02): `archive/` and `evidence/` under doc/constraint-led-solving/ were removed; files cited there are in git history.
 Problem spec: probs/problem-corner-topo.lisp.
 Corresponding diagram: doc/problems/corner-topo/problem-corner-topo-plus.jpg.

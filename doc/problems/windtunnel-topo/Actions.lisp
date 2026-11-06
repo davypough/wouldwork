@@ -10,7 +10,8 @@
     (move agent1* ((step (location2 plate1) nil (location2 ground))))
     ;; physical and recording latches both on; the live connector sees the source
     (pickup-connector agent1 connector1 location1)
-    (connect-connector agent1 connector1 ground (repeater1 transmitter1) location1)
+    (select-termini agent1 (repeater1 transmitter1) connector1 location1)
+    (put-connector agent1 connector1 ground location1)
     (move agent1 ((walk location1 nil location2)))
     (move agent1 ((step (location2 ground) nil (location2 plate1))))
     (move agent1 ((step (location2 plate1) nil (location2 ground))))
@@ -21,7 +22,8 @@
     (move agent1* ((step (location2 plate1) nil (location2 ground))))
     ;; physical on, recording off; the ghost places its connector
     (move agent1* ((walk location2 (blower1) location3)))
-    (connect-connector agent1* connector1* ground (repeater1 receiver1) location3)
+    (select-termini agent1* (repeater1 receiver1) connector1* location3)
+    (put-connector agent1* connector1* ground location3)
     (move agent1 ((walk location4 (gate2) location5)))))
 
 
