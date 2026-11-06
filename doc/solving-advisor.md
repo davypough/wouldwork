@@ -731,13 +731,16 @@ Their contracts are in `doc/constraint-led-solving/Extractor-Specifications.md`.
 ### Engine facts: beams, relays and connectors
 
 A grounded agent cannot place onto a held tray (top 3/2, placement reach 1);
-use a raised location. CONNECT-CONNECTOR sets the connector down, never pairs
-while held; pairing uses structural sightlines. Generated termini are reversed
+use a raised location. SELECT-TERMINI chooses termini while the connector is held,
+by structural sightlines from the agent's current location; a selection survives later
+moves, including one-way drops. PUT-CONNECTOR sets the connector down and pairs every
+selection; without selections it pairs nothing. Generated termini are reversed
 (e.g. repeater then receiver): hand-written termini must follow reverse declaration
 order (connectors, receivers, transmitters, each descending), since the validator
 compares them strictly. HOLDING is bijective, printed HOLDING1/HOLDING2.
-Connecting is refused at a location holding a lit connector. PICKUP-CONNECTOR clears
-that connector's pairings and beams: the only undo at the agent's own location.
+A put-down with selections is refused at a location holding a lit connector or a
+selected connector terminus. PICKUP-CONNECTOR clears that connector's pairings, beams and
+any selection naming it: the only undo at the agent's own location.
 Beam crossings: two live beams that cross cut each other; a beam cut nearer its
 source never reaches later crossings, so an earlier sacrificial crossing shields
 them. A crossing on the source side of a closed gate still acts. A transmitter

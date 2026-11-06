@@ -6,12 +6,12 @@
 ;;; connector1 on the ground beaming to connector2 resting on a stack of boxes, with a low
 ;;; obstacle sitting between them.
 ;;;
-;;; Sightlines here are hand-authored, not WALL-SEGMENT>-derived: connect-connector's initial
-;;; PAIRED facts are checked at load time against literal LOS-VIA
-;;; entries in DEFINE-INIT (CHECK-INIT-PAIRED-SIGHTLINES), which run before any coordinate
-;;; derivation would; a WALL-SEGMENT>-driven problem instead builds its PAIRED facts at solve
-;;; time via connect-connector, never hand-authoring them in DEFINE-INIT.  low and high both
-;;; get a direct, unoccluded LOS-VIA to their own transmitter/receiver; the interesting hop
+;;; Sightlines here are hand-authored, not WALL-SEGMENT>-derived: the initial PAIRED facts
+;;; are checked at load time against literal LOS-VIA entries in DEFINE-INIT
+;;; (CHECK-INIT-PAIRED-SIGHTLINES), which run before any coordinate derivation would; a
+;;; WALL-SEGMENT>-driven problem instead builds its PAIRED facts at solve time via
+;;; select-termini and put-connector, never hand-authoring them in DEFINE-INIT.  low and
+;;; high both get a direct, unoccluded LOS-VIA to their own transmitter/receiver; the interesting hop
 ;;; is connector1 -> connector2's location-to-location LOS-VIA, which names mid as its
 ;;; one occluder candidate.
 ;;;
@@ -132,7 +132,7 @@
   (has-height box2 2)
 
   ;; Beam wiring: transmitter1 -> connector1 -> connector2 -> receiver1, pre-paired rather
-  ;; than built by connect-connector, so the puzzle turns on the sightline geometry and
+  ;; than built by put-connector, so the puzzle turns on the sightline geometry and
   ;; elevation, not on assembling the relay chain.  low/high each get a direct, unoccluded
   ;; sightline to their own apparatus; mid is the one occluder candidate, on the
   ;; connector1<->connector2 hop only.

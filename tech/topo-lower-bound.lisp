@@ -993,7 +993,9 @@ a disjunction, where a controller some clause avoids is not forced."
   "One CONNECT to light RECEIVER, plus one PICKUP unless a connector is already held.
 
 No permissive structural beam path reaching the receiver means moving an occluder cannot
-create one, so under the standard relay provider at least one CONNECT-CONNECTOR is required.
+create one, so under the standard relay provider at least one pairing PUT-CONNECTOR is
+required.  CONNECT stays one step although pairing also needs a SELECT-TERMINI: the charge
+remains admissible, only looser.
 The abstentions match TOPO-CONTROL-BEAM-LINK-STATUS: an unmodelled provider, a problem with
 no connector, and a connector whose placement the manipulation component already charges each
 cost nothing.  The structural test is last because it is the only expensive one."

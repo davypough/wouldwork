@@ -1611,13 +1611,18 @@ settings change. No problem object is named in code (C3).
   recomputed in each propagation after the crossing set, and each
   receiver's ACTIVE fact (RECORDING-ACTIVE in the recording view).
 - *Moves*: connectors only. PICKUP-CONNECTOR lifts one and deletes every
-  PAIRED fact it owns and every one naming it.
-  PICKUP-CONNECTOR-RETAINING-PAIRINGS keeps them; a held connector has no
-  location, so it neither receives nor sends a beam. PUT-CONNECTOR places
-  without pairing. CONNECT-CONNECTOR places the held connector at a
-  location the agent reaches and stores 1 to *MAX-CONNECTOR-PAIRINGS*
-  outgoing PAIRED facts, to termini structurally visible from any location
-  the agent can walk to, never to a connector at the placement location.
+  PAIRED fact it owns and every one naming it, and every SELECTED fact
+  naming it. PICKUP-CONNECTOR-RETAINING-PAIRINGS keeps the PAIRED facts; a
+  held connector has no location, so it neither receives nor sends a beam.
+  SELECT-TERMINI, while a connector is held, stores SELECTED facts for 1 or
+  more termini structurally visible (gates ignored) from the agent's
+  current location, never past *MAX-CONNECTOR-PAIRINGS* links on the
+  connector or on a connector terminus, and never for a terminus it is
+  already linked to or has selected; selections survive later moves.
+  PUT-CONNECTOR places the held connector at a location the agent reaches
+  and converts every selection into a PAIRED fact, never at the location of
+  a selected connector terminus; without selections it places without
+  pairing.
 - *Requires*: lighting runs in propagation layers from every transmitter
   (layer 0). A relay settles in the first layer in which any clear link
   from a lit source reaches it: one hue lights it; two or more hues in that
@@ -1627,11 +1632,11 @@ settings change. No problem object is named in code (C3).
   direction (COUPLED for fixed apparatus), a live sightline in the reading
   view, and no cut by an active crossing (physical view only). Pairings
   persist while their beam is blocked or cut; only pickup clears them.
-  Capacity counts a connector's outgoing pairings; incoming links are
-  unlimited. A receiver is reached only by a relay of its hue whose own
+  Capacity counts every link and pending selection naming a connector,
+  either direction, retained links included. A receiver is reached only by a relay of its hue whose own
   outgoing pairing (or coupling) names it, visible and uncut; beam-direct
-  may reach it independently. CONNECT-CONNECTOR needs no lit connector of
-  the same recorder layer at the placement location. Layers are propagation
+  may reach it independently. PUT-CONNECTOR with selections needs no lit
+  connector of the same recorder layer at the placement location. Layers are propagation
   order, not travel time or action order.
 
 **Static instance rows (grade 1, candidates grade 2).** Under the contract:

@@ -189,23 +189,32 @@ action.
 
 - `pickup-connector`: `pickup-clear` requires an empty-handed agent, a reachable connector
   (identity reach unless a reach technology is installed), and vertical reach. The action
-  removes every `paired` fact on the connector, in both directions.
+  removes every `paired` fact on the connector, in both directions, and every `selected`
+  fact naming it as a terminus.
 - `pickup-connector-retaining-pairings`: the same lift, but every `paired` fact survives.
   It is offered only when the connector has at least one pairing, since otherwise it
   duplicates `pickup-connector` exactly.
   A held connector has no `has-location` and so emits no beam. Setting it down again with
   `put-connector` revives whatever its retained pairings can still light.
-- `put-connector`: sets the held connector down at a reachable location without adding
-  pairings.
-- `connect-connector`: sets the held connector down at a reachable location and pairs it
-  with 1 to `*max-connector-pairings*` termini (default 3) in a single action.
-  - **Termini:** a terminus qualifies when it is structurally visible (`potentially-visible`)
-    from any location the agent can currently move to (`mobility-locations`), not
-    necessarily from the placement location. Whether the beam actually carries a hue is
-    decided later by live beam visibility from the placement.
-  - **Connector termini:** a connector terminus must sit at a different location.
-  - **Placement restriction:** `connectable-location` forbids placement where another
-    connector is already lit.
+- `select-termini`: while the agent holds a connector, selects 1 or more termini in one
+  action, one action per viewpoint. Each child asserts `(selected connector terminus)` for
+  a nonempty subset of the eligible termini. Lighting is unaffected.
+  - **Termini:** a terminus qualifies when it is structurally visible (`potentially-visible`,
+    gates ignored) from the agent's current location. Whether the beam actually carries a
+    hue is decided later by live beam visibility from the placement.
+  - **Persistence:** a selection survives later loss of sight and later one-way moves
+    (jump drops, blowers).
+  - **Capacity:** `connector-link-count` counts `paired` and `selected` facts on either
+    side, retained links included; neither the connector nor a connector terminus may pass
+    `*max-connector-pairings*` (default 3). A terminus already linked to or selected by the
+    connector is not offered again.
+  - **Connector termini:** a connector terminus must stand somewhere (not held).
+- `put-connector`: the single put-down. Sets the held connector down at a reachable
+  location, converts every `selected` fact into a `paired` fact, and clears the selections.
+  Without selections it adds no pairings.
+  - **Placement restriction (with selections):** `connectable-location` forbids placement
+    where another connector is already lit, and the placement location may not hold a
+    selected connector terminus.
 
 **Lighting** (`compute-relay-lighting`). Hues spread breadth-first from the transmitters,
 one relay link per layer.

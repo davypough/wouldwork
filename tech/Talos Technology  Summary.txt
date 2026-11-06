@@ -85,6 +85,7 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (recorder-cycles-used $fixnum)  ;planner-state count incremented by start-recorder
 (recording-in-progress)  ;true between start-recorder and either explicit ending
 (recording-switched-on switch)  ;recording-side persistent switch state
+(selected connector terminus)  ;pending pairing chosen by select-termini; put-connector pairs and clears it
 (switched-on switch)  ;persistent ordinary state; absence means off
 (turning (either floor-gears wall-gears angled-gears floor-blower wall-blower angled-blower))
 
@@ -123,7 +124,6 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 
 5. Actions
 
-(connect-connector ">" ?agent "connects" $connector "on" $place "to" $termini "at" ?location)
 (jam-target ">" ?agent "jams" ?target "with" $any-jammer "at" ?location "on" $place)
 (mount-fan ">" ?agent "mounts" ?fan "on" ?gears "at" $g-location)
 (move ">" ?agent "moves via" $route)
@@ -133,10 +133,11 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (pickup-jammer ">" ?agent "picks up" ?jammer "at" $a-location)
 (pickup-tray ">" ?agent "picks up" ?tray "at" $tray-location "from" $a-location)
 (put-box ">" ?agent "puts" ?box "on" $place "at" ?location)
-(put-connector ">" ?agent "puts" ?connector "on" $place "without pairings at" ?location)
+(put-connector ">" ?agent "puts" ?connector "on" $place "at" ?location)  ;pairs every selected terminus
 (put-fan ">" ?agent "puts" ?fan "on" $place "at" ?location)
 (put-jammer ">" ?agent "puts" ?jammer "on" $place "at" ?location "without jamming")
 (put-tray ">" ?agent "puts" ?tray "on" $place "at" ?location)
+(select-termini ">" ?agent "selects" $termini "for" $connector "at" $a-location)
 (start-recorder ">" ?agent "starts the recorder")
 (stop-recorder ">" ?agent "stops the recorder")
 (toggle-switch ">" ?agent "toggles" ?switch)

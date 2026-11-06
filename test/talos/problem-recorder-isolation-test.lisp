@@ -301,27 +301,27 @@
   ;; Live playback may use either connector layer.  Ghost recording may use only ghost
   ;; movable connectors.  Fixed transmitter apparatus is shared.
   (and (connectable-terminus
-         live-pair-agent '(pair-origin) pair-origin
+         live-pair-agent pair-origin
          live-pair-connector live-target-connector)
        (connectable-terminus
-         live-pair-agent '(pair-origin) pair-origin
+         live-pair-agent pair-origin
          live-pair-connector ghost-target-connector)
        (connectable-terminus
-         ghost-pair-agent '(pair-origin) pair-origin
+         ghost-pair-agent pair-origin
          ghost-pair-connector ghost-target-connector)
        (not (connectable-terminus
-              ghost-pair-agent '(pair-origin) pair-origin
+              ghost-pair-agent pair-origin
               ghost-pair-connector live-target-connector))
        (connectable-terminus
-         live-pair-agent '(pair-origin) pair-origin
+         live-pair-agent pair-origin
          live-pair-connector shared-transmitter)
        (connectable-terminus
-         ghost-pair-agent '(pair-origin) pair-origin
+         ghost-pair-agent pair-origin
          ghost-pair-connector shared-transmitter)
        (recorder-isolation-action-applicable-p
-         state 'connect-connector '(live-pair-agent pair-origin))
+         state 'select-termini '(live-pair-agent))
        (recorder-isolation-action-applicable-p
-         state 'connect-connector '(ghost-pair-agent pair-origin))))
+         state 'select-termini '(ghost-pair-agent))))
 
 
 (define-goal

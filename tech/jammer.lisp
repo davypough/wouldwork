@@ -7,8 +7,8 @@
 ;;; always disables the barrier or threat.  A placed jammer is movable cargo: it may rest
 ;;; on a plate (depressing it) or a clear box top, and picking it up clears both its
 ;;; jamming and its support.  Put-jammer places it inertly -- no target required --
-;;; exactly mirroring put-connector's relationship to connect-connector; jam-target is
-;;; the active variant that also establishes jamming.
+;;; like put-connector without selections; jam-target is the active variant that also
+;;; establishes jamming.
 ;;;
 ;;; REQUIRES (supplied by other techs):
 ;;;   types     : agent, location; plate comes from nested -plate-types, while jammer
