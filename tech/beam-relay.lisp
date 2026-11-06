@@ -6,9 +6,12 @@
 ;;; corridors.  A relay lights only when every source reaching it in the same propagation
 ;;; layer carries one hue.  Conflicting hues leave it unlit.
 ;;;
-;;; Connectors retain their pickup/placement/pairing actions.  Repeaters have no
-;;; HAS-LOCATION and no actions; repeater.lisp assembles this peer with beam-direct and
-;;; visibility so fixed corridors and apparatus sightlines are live.
+;;; Connectors retain their pickup/placement/pairing actions.  Pairing is split as in the
+;;; game: SELECT-TERMINI records SELECTED facts while the connector is held, from wherever
+;;; the agent stands, and PUT-CONNECTOR converts every selection into a PAIRED fact at
+;;; put-down.  Repeaters have no HAS-LOCATION and no actions; repeater.lisp assembles
+;;; this peer with beam-direct and visibility so fixed corridors and apparatus sightlines
+;;; are live.
 ;;;
 ;;; REQUIRES:
 ;;;   types      : agent, location -- connector/transmitter/receiver/repeater and related
@@ -16,18 +19,18 @@
 ;;;   nested     : -propagation (derived-state driver); -beam-substrate (beam relations
 ;;;                and hooks); -placement; -visibility (null defaults); -vertical (top);
 ;;;                -mobility; -reachability; -pickup; -beam-relay-init-checks;
-;;;                -recorder-fork-registry (paired-fact fork)
+;;;                -recorder-fork-registry (paired- and selected-fact forks)
 ;;;   parameter  : *max-connector-pairings* -- defaults to 3; at most that many PAIRED links per
-;;;                connector at any time, counting links on both sides and links retained
-;;;                through a pickup; fixed couplings are unlimited; a problem may set a
-;;;                smaller value first
+;;;                connector at any time, counting links on both sides, links retained
+;;;                through a pickup, and pending SELECTED facts; fixed couplings are
+;;;                unlimited; a problem may set a smaller value first
 ;;;   driver     : propagate-consequences! must call
 ;;;                  update-relay-status! -> update-receiver-status!
 ;;; PROVIDES:
 ;;;   types      : relay (either connector floor-repeater wall-repeater);
 ;;;                terminus (either transmitter receiver connector floor-repeater
 ;;;                wall-repeater)
-;;;   relations  : paired, color
+;;;   relations  : paired, selected, color
 ;;;   queries    : relay-beam-reaches-receiver,
 ;;;                recording-shadow-relay-beam-reaches-receiver,
 ;;;                compute-relay-lighting, compute-relay-lighting-for-object,
@@ -38,7 +41,7 @@
 ;;;                connectable-location, connectable-terminus, connector-link-count
 ;;;   updates    : update-relay-status!
 ;;;   actions    : pickup-connector, pickup-connector-retaining-pairings,
-;;;                put-connector, connect-connector
+;;;                put-connector, select-termini
 
 (include-tech -propagation)
 (include-tech -beam-substrate)
@@ -68,6 +71,7 @@
 
 (define-dynamic-relations
   (paired connector terminus)
+  (selected connector terminus)
   (color relay $hue))
 
 
@@ -98,6 +102,23 @@
                  (paired ?connector $terminus-ghost))))))))
 
 
+;; SELECTED's contribution to the recorder's ghost fork, built like PAIRED's above: a
+;; live holder's pending selections carry over to its ghost holder, with each side
+;; substituted by its ghost where one exists.
+(register-recorder-fork-clause 'selected
+  '(doall (?connector connector)
+     (doall (?terminus terminus)
+       (if (selected ?connector ?terminus)
+         (do (assign $connector-ghost nil)
+             (assign $terminus-ghost nil)
+             (if (bind (recording-copy> ?connector $connector-ghost))
+               (if (bind (recording-copy> ?terminus $terminus-ghost))
+                 (selected $connector-ghost $terminus-ghost)
+                 (selected $connector-ghost ?terminus))
+               (if (bind (recording-copy> ?terminus $terminus-ghost))
+                 (selected ?connector $terminus-ghost))))))))
+
+
 ;;;; ACTIONS ;;;;
 
 
@@ -115,7 +136,10 @@
                   (not (paired ?connector ?t))))
               (doall (?c connector)
                 (if (paired ?c ?connector)
-                  (not (paired ?c ?connector)))))
+                  (not (paired ?c ?connector))))
+              (doall (?c connector)
+                (if (selected ?c ?connector)
+                  (not (selected ?c ?connector)))))
           (if (bind (on ?connector $support))
             (not (on ?connector $support)))
           (finally (propagate-changes!))))
@@ -147,53 +171,57 @@
 
 
 (define-action put-connector
+  ;; The single put-down.  Every pending selection becomes a PAIRED fact and is cleared.
+  ;; With selections, the placement location must hold no lit other connector and no
+  ;; selected connector terminus; without them this is a plain put-down.
   1
   (?agent agent ?connector connector ?location location)
   (and (holding ?agent ?connector)
        (bind (has-location ?agent $a-location))
        (reachable ?location $a-location)
+       (or (not (exists (?t terminus)
+                  (selected ?connector ?t)))
+           (and (connectable-location ?connector ?location)
+                (not (exists (?c connector)
+                       (and (selected ?connector ?c)
+                            (has-location ?c ?location))))))
        (assign $places (placement-options ?agent ?location ?connector)))
-  (">" ?agent "puts" ?connector "on" $place "without pairings at" ?location)
+  (">" ?agent "puts" ?connector "on" $place "at" ?location)
   (ww-loop for $placement-option in $places
            do (assert (assign $place $placement-option)
                       (place-held-object!
                         ?agent ?connector ?location $placement-option)
+                      (doall (?t terminus)
+                        (if (selected ?connector ?t)
+                          (do (not (selected ?connector ?t))
+                              (paired ?connector ?t))))
                       (finally (propagate-changes!)))))
 
 
-(define-action connect-connector
+(define-action select-termini
+  ;; Selection happens while the connector is held, from the agent's current location,
+  ;; and survives later moves, including one-way drops.  One action per viewpoint: each
+  ;; child selects a nonempty subset of the termini structurally visible from here,
+  ;; within the room left under *max-connector-pairings*.  Lighting is unaffected.
   1
-  (?agent agent ?location location)
+  (?agent agent)
   (and (bind (holding ?agent $connector))
        (connector $connector)
-       (assign $link-room
+       (assign $selection-room
                (- *max-connector-pairings* (connector-link-count $connector)))
-       (> $link-room 0)
+       (> $selection-room 0)
        (bind (has-location ?agent $a-location))
-       (reachable ?location $a-location)
-       (connectable-location $connector ?location)
-       (assign $places (placement-options ?agent ?location $connector))
-       (assign $pairing-vantages (mobility-locations ?agent $a-location))
-        (exists (?t terminus)
-          (connectable-terminus
-            ?agent $pairing-vantages ?location $connector ?t)))
-  (">" ?agent "connects" $connector "on" $place "to" $termini "at" ?location)
-  (do (assign $connectable nil)
+       (exists (?t terminus)
+         (connectable-terminus ?agent $a-location $connector ?t)))
+  (">" ?agent "selects" $termini "for" $connector "at" $a-location)
+  (do (assign $selectable nil)
       (doall (?terminus terminus)
-        (if (connectable-terminus
-              ?agent $pairing-vantages ?location $connector ?terminus)
-          (assign $connectable (cons ?terminus $connectable))))
-      (ww-loop for $selected-termini in
-                 (rest (subsets-up-to $connectable $link-room))
-               do (ww-loop for $placement-option in $places
-                           do (assert
-                                (assign $termini $selected-termini)
-                                (assign $place $placement-option)
-                                (place-held-object!
-                                  ?agent $connector ?location $placement-option)
-                                (ww-loop for $terminus in $selected-termini
-                                         do (paired $connector $terminus))
-                                (finally (propagate-changes!)))))))
+        (if (connectable-terminus ?agent $a-location $connector ?terminus)
+          (assign $selectable (cons ?terminus $selectable))))
+      (ww-loop for $subset in (rest (subsets-up-to $selectable $selection-room))
+               do (assert (assign $termini $subset)
+                          (ww-loop for $terminus in $subset
+                                   do (selected $connector $terminus))))))
 
 
 ;;;; UPDATE FUNCTIONS ;;;;
@@ -465,39 +493,41 @@
 
 (define-query connectable-terminus
     (?agent agent
-     ?pairing-vantages
-     ?placement-location location
+     ?vantage location
      ?connector connector
      ?terminus terminus)
-  ;; Pairing selection uses structural LOS from any currently traversable vantage.  Exact
-  ;; placement and live visibility subsequently determine whether the beam carries color.
-  ;; A terminus already linked to the connector, either direction, is not offered again,
-  ;; and a connector terminus must have room under *max-connector-pairings*.
+  ;; Selection uses structural LOS (gates ignored) from the agent's current location.
+  ;; Exact placement and live visibility later decide whether the beam carries color.
+  ;; A terminus already linked to or selected by the connector is not offered again.
+  ;; A connector terminus must stand somewhere (not held) and have room under
+  ;; *max-connector-pairings*.  Same-location connector pairs are excluded at put-down.
   (and (connector-pairing-allowed ?agent ?connector ?terminus)
        (not (paired ?connector ?terminus))
-       (or (not (connector ?terminus))
-           (and (not (paired ?terminus ?connector))
-                (< (connector-link-count ?terminus) *max-connector-pairings*)))
-       (ww-loop for $vantage in ?pairing-vantages
-                thereis
-                  (or (and (or (transmitter ?terminus)
-                               (receiver ?terminus)
-                               (repeater ?terminus))
-                           (potentially-visible $vantage ?terminus))
-                      (and (connector ?terminus)
-                           (different ?terminus ?connector)
-                           (bind (has-location ?terminus $terminus-location))
-                           (different ?placement-location $terminus-location)
-                           (potentially-visible $vantage $terminus-location))))))
+       (not (selected ?connector ?terminus))
+       (or (and (or (transmitter ?terminus)
+                    (receiver ?terminus)
+                    (repeater ?terminus))
+                (potentially-visible ?vantage ?terminus))
+           (and (connector ?terminus)
+                (different ?terminus ?connector)
+                (not (paired ?terminus ?connector))
+                (< (connector-link-count ?terminus) *max-connector-pairings*)
+                (bind (has-location ?terminus $terminus-location))
+                (potentially-visible ?vantage $terminus-location)))))
 
 
 (define-query connector-link-count (?connector connector)
-  ;; Every PAIRED fact naming the connector, on either side.  Retained links count.
+  ;; Every PAIRED or SELECTED fact naming the connector, on either side.  Retained links
+  ;; count, and so do pending selections, which become links at put-down.
   (do (assign $count 0)
       (doall (?terminus terminus)
-        (if (paired ?connector ?terminus)
-          (assign $count (1+ $count))))
+        (do (if (paired ?connector ?terminus)
+              (assign $count (1+ $count)))
+            (if (selected ?connector ?terminus)
+              (assign $count (1+ $count)))))
       (doall (?other connector)
-        (if (paired ?other ?connector)
-          (assign $count (1+ $count))))
+        (do (if (paired ?other ?connector)
+              (assign $count (1+ $count)))
+            (if (selected ?other ?connector)
+              (assign $count (1+ $count)))))
       $count))

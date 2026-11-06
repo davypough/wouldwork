@@ -1,0 +1,48 @@
+INTERSECT -- OPTIONAL SEARCH-ADVISOR HANDOFF
+Revision: 2026-11-05 (revision 1)
+Status: Specification complete for the agreed scope; ready for optional search-advisor work.
+Preparing this handoff does not invoke the search advisor or authorize experiments.
+
+RECORDS
+Requirements: problem-analysis.txt (rev 3 with addenda)
+Current implementation and evidence: spec-analysis.txt (checks 1-13)
+Specification: ../../../probs/problem-intersect.lisp
+Diagram: intersect-diagram.png
+
+DELIVERED MODEL
+Path B: talos tech (gate, plate, step, ladder, beam-relay, beam-crossing,
+walkability, visibility) with coordinate-derived geometry, as in rumin-topo.
+No problem-specific actions.  Stored state: agent location, held connector,
+connector locations, links.  Colors, crossings, receivers, gates and plate are
+derived after every action.  Reach is same-location only (reachability tech
+omitted; no reach edge would be derived), so windows bar reach by construction.
+Link cap: at most 3 links per connector, counting incoming and retained links.
+
+OBJECTIVE
+Any plan reaching (has-location agent1 location7); shortest preferred; every
+action costs 1.  The gate order G1 -> G2 -> G3 -> G4 is forced (analysis).
+
+ENHANCEMENTS
+E1 connector symmetry pruning (*symmetry-pruning* t): safety check passes;
+   0 duplicates within depth 7, so benefit unmeasured.
+E2 min-steps-remaining? placeholder (0 at location7, else 1): sound; 0 prunes.
+
+SETTINGS AND VALIDATION
+File settings: planning, MIN-LENGTH, GRAPH, *max-connector-pairings* 3, symmetry
+pruning on, *depth-cutoff* 7 (provisional, smoke limit).  *threads* 16 at the REPL.
+Windows (user-run) and cloud SBCL 2.2.9 agree: stages without warnings; depth 7,
+16 threads: 5,721 states, 3,534 repeats, 842 cutoff hits, 31 inconsistent states
+abandoned (propagation oscillation, physically unstable configurations), no solution.
+Reproduction: (stage intersect), (ww-set *threads* 16), (solve).
+
+OPEN PERFORMANCE QUESTIONS (search advisor; each needs its own approved plan)
+- Proposed first question: how the reachable space grows with depth beyond 7
+  under the link cap, to set a feasible maximum depth for a full solve.
+- A stronger min-steps-remaining? bound (e.g. closed gates left on the forced route).
+- Whether omitting pickup-retaining-pairings is safe and worthwhile (D3).
+- E1 benefit once connectors can be swapped; connect branching at the cap of 3.
+No size limit or speedup has been established.  Fidelity defects return to the
+spec review rather than being treated as tuning.
+
+REMAINING
+A full (test-talos) on Windows for the link-cap tech change (spec-analysis item 9).

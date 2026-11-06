@@ -45,7 +45,6 @@
 (include-tech beam-crossing)
 (include-tech walkability)
 (include-tech visibility)
-(include-tech reachability)
 
 
 ;;;; INITIALIZATION ;;;;

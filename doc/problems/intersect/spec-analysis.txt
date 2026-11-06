@@ -1,6 +1,6 @@
 PROBLEM / REVISION / AUTHORIZED SCOPE
   Active record: doc/problems/intersect/spec-analysis.txt.
-  Specification: probs/problem-intersect.lisp (new), revision 1 in progress.
+  Specification: probs/problem-intersect.lisp (new), revision 1, complete 2026-11-05.
   Scope approved by user 2026-11-05: draft the spec section by section; read tech sources
   (gate, plate, beam-relay, beam-crossing, walkability, visibility, reachability, ladder,
   elevation if needed) and probs/problem-rumin-topo.lisp as a coordinate-geometry pattern;
@@ -29,12 +29,21 @@ REPRESENTATION AND AUTHORING APPROACH
     gets REACH-DISALLOWED>; the exact pairs are measured after staging.
 
 SECTION REVIEW AND REQUIREMENT MAPPING
-  1 Representation and settings: written 2026-11-05; described, code not shown.
+  1 Representation and settings: written 2026-11-05; code shown and approved as written
+    by user 2026-11-05 (symmetry-pruning line reviewed with E1).
     User added the no-reach-through-windows rule.
-  2 Objects and fixed geometry: written 2026-11-05; described, code not shown.
-  3-6 Tech includes (step added after check 3d), start state (C2 at L2, C3 at L3 per
-    user), init action, goal: written 2026-11-05; code not shown.
-  All sections to be presented for user approval on resuming (user, 2026-11-05).
+  2 Objects and fixed geometry: written 2026-11-05; code shown and approved as written
+    by user 2026-11-05.
+  3 Tech includes: (include-tech reachability) removed (user, 2026-11-05) -- no reach
+    edges are derived (item 2), so beam-relay's own same-location reach rule is
+    equivalent and makes no-reach-through-windows hold by construction.  Check 10.
+    Section 3 code shown and approved as revised by user 2026-11-05.
+  4 Start state (C2 at L2, C3 at L3 per user): code shown and approved as written by
+    user 2026-11-05.
+  5 Init action: code shown and approved as written by user 2026-11-05.
+  6 Goal and basic-model requirement account: approved by user 2026-11-05.
+  Basic model (sections 1-6) complete and approved; E1 and E2 approved by user
+  2026-11-05.  Final review and diagram check done (checks 11-13).
 
 ENHANCEMENTS FOR THE LARGER FAMILY  (agenda agreed by user 2026-11-05)
   E1 Connector symmetry pruning: (ww-set *symmetry-pruning* t).  Growth: number of
@@ -157,20 +166,44 @@ CHECKS AND EVIDENCE
      final-state connectable-terminus checks were updated for the no-re-link rule.
      A full (test-talos) on Windows is the remaining confirmation.
 
+  10. Reachability removal, cloud SBCL 2.2.9 (fresh clone of HEAD 4b4cd81 plus the spec
+     edit), 2026-11-05, assistant-run.  Depth 7, *threads* 16, E1/E2 on.  With and
+     without (include-tech reachability): identical -- 5,721 states, 3,534 repeats,
+     31 inconsistent abandoned, branching 4.3, no solution, 2.1 s.  (The earlier
+     75,285 figure predates the link cap of item 9.)
+
+  11. Final review, 2026-11-05.  Final revision = check 10's no-reachability file.
+     Staging of INTERSECT itself: no warnings or errors.  The container's system load
+     prints 153 'undefined variable' WARNINGs from src/ engine files, all before the
+     problem is staged (engine/environment, fresh SBCL 2.2.9 compile); Windows
+     confirmation pending.  Bounded run = check 10 (depth 7, *threads* 16, E1/E2 on):
+     completed normally, no solution.  Pass.
+  12. Diagram vs spec (user request), 2026-11-05, intersect-diagram.png read at full
+     resolution.  Boundary, w1-w10, WIN1-4, G2-G4, all six fixtures, L1-L7, starts of
+     A1/C1-C3, P1, LD1 agree with the spec.  One question for the user: near R1b the
+     y=6 line looks dashed from about x=12.5, while the spec (and rev 3 analysis) puts
+     G1 at x14-17.  User confirmed G1 x14-17 (2026-11-05); no change.  Unlabeled marks assumed stray: a dot just outside the top wall at
+     about x=16.4 and a tick on the top wall at x=17; erased circles in the central room.
+  13. Windows confirmation (user-run), 2026-11-05, final revision.  *threads* 16: identical
+     to the container (5,721 states, 3,534 repeats, 842 cutoff hits, 31 inconsistent,
+     branching 4.3, no solution, 0.5 s).  Serial run: same 5,721/3,534/842/1,345, with
+     14 inconsistent and branching 2.6 (serial vs parallel counting, as in check 5).
+
 READINESS AND OPEN ISSUES
-  Resolved: window reach (none derived, item 2); agent presses P1 via step tech (item 3d);
-  *threads* 16 runs (items 4, 7, 8); C2/C3 start corrections (item 7); connector link
-  cap (item 9).
-  Open: not yet shown to the user: the spec code.
+  Status: Specification complete for the agreed scope (2026-11-05).
+  Windows staging of the final revision: no warnings or notes (user, 2026-11-05).
+  Resolved: window reach (reachability tech removed, check 10); agent presses P1 via step
+  tech (3d); C2/C3 starts (7); connector link cap (9); G1 extent x14-17 (12); all
+  sections and E1, E2 shown and approved.
+  Remaining, not blocking: a full (test-talos) on Windows for the link-cap tech change
+  (item 9); the container's engine-load warnings did not occur on Windows.
+  Deferred to the search advisor: maximum feasible depth and plan length; omitting
+  retaining pickup (D3); a stronger min-steps-remaining? bound; E1 benefit at depth;
+  connect-connector branching at the cap of 3.
 
 HANDOFF AND NEXT STEP
-  Step 4 done (E1, E2).  Rule answered (user, 2026-11-05): a connector has at most 3
-  links at any time, counting links it made and links made to it by other connectors;
-  retained links (optional on pickup) still count.  Tech change done and tested
-  (item 9); the earlier 3,488/4,082 inconsistent-state counts predate it.
-  Process correction (user, 2026-11-05): the spec code has not been shown.  On resuming,
-  present sections 1-6 and E1, E2 for approval one at a time; each section is approved
-  as written before its testing begins.  Then step 5 final review.
+  Handoff: spec-analysis-search-handoff.txt.  The search-advisor phase is not yet
+  authorized.
 
 CORRECTIONS AND HISTORY
   None.
