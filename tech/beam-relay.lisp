@@ -389,12 +389,14 @@
   ;; True when a connector already lit in ?LIGHTING stands at ?ANCHOR on ?CONNECTOR's
   ;; recording side.  Live and ghost copies never clash (CONNECTOR-LOCATION-CONFLICT-P).
   (do (assign $clash nil)
+      ;; One DO form: in a problem with no connector type the IF translates to NIL, which
+      ;; LOOP would reject as a bare keyword.
       (ww-loop for $record in ?lighting
-               do (assign $other (first $record))
-                  (if (and (connector $other)
-                           (eql (relay-anchor $other) ?anchor)
-                           (connector-location-conflict-p ?connector $other))
-                    (assign $clash t)))
+               do (do (assign $other (first $record))
+                      (if (and (connector $other)
+                               (eql (relay-anchor $other) ?anchor)
+                               (connector-location-conflict-p ?connector $other))
+                        (assign $clash t))))
       $clash))
 
 
