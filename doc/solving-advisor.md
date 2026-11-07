@@ -738,8 +738,9 @@ selection; without selections it pairs nothing. Generated termini are reversed
 (e.g. repeater then receiver): hand-written termini must follow reverse declaration
 order (connectors, receivers, transmitters, each descending), since the validator
 compares them strictly. HOLDING is bijective, printed HOLDING1/HOLDING2.
-A put-down with selections is refused at a location holding a lit connector or a
-selected connector terminus. PICKUP-CONNECTOR clears that connector's pairings, beams and
+No state may hold two active connectors at one location: such a state is discarded,
+whatever action caused it (an inactive connector may sit beside an active one).
+PICKUP-CONNECTOR clears that connector's pairings, beams and
 any selection naming it: the only undo at the agent's own location.
 Beam crossings: two live beams that cross cut each other; a beam cut nearer its
 source never reaches later crossings, so an earlier sacrificial crossing shields

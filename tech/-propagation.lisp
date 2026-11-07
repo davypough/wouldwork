@@ -34,12 +34,21 @@
 ;;; wins -- the same rule the peer-substrate technologies already rely on.  An authored
 ;;; PROPAGATE-CONSEQUENCES! displaces the sentinel, and INIT then leaves it alone.
 ;;;
+;;; A technology may also declare a STATE INVARIANT: a condition that no settled state may
+;;; satisfy.  It overrides PROPAGATION-INVARIANT-VIOLATED, whose default here is false, and
+;;; PROPAGATE-CHANGES! tests it once after convergence, declaring a violating state
+;;; inconsistent so every search mode drops it.  The test must wait for convergence: an
+;;; earlier pass can see stale derived facts, and an inconsistency marker cannot be
+;;; withdrawn.  Only BEAM-RELAY overrides it today (two active connectors at one location);
+;;; a second owner would need a registry like -RECORDER-FORK-REGISTRY's.
+;;;
 ;;; REQUIRES (supplied by the planner, not by another technology):
 ;;;   specials  : *detect-propagated-changes*, *propagated-state-changed* (ww-settings)
 ;;;   functions : inconsistent-state, propagation-driver-not-derived
 ;;; PROVIDES:
 ;;;   update    : propagate-changes!  --  the fixpoint loop, final
 ;;;   update    : propagate-consequences!  --  sentinel only; INIT installs the real body
+;;;   query     : propagation-invariant-violated  --  default false; a technology overrides
 
 (in-package :ww)
 
@@ -51,7 +60,9 @@
   (let ((*detect-propagated-changes* t))
     (ww-loop for $iteration from 1 to 10
              do (if (not (propagate-consequences!))
-                  (return t))
+                  (do (if (propagation-invariant-violated)
+                        (inconsistent-state))
+                      (return t)))
              finally (inconsistent-state)
                      (return nil))))
 
@@ -60,3 +71,8 @@
   ;; Sentinel.  INIT replaces this body with the derived call sequence, or a problem's own
   ;; driver overrides it at load.  Reaching it means neither happened.
   (propagation-driver-not-derived))
+
+
+(define-query propagation-invariant-violated ()
+  ;; Default: no technology invariant.  BEAM-RELAY overrides this.
+  nil)

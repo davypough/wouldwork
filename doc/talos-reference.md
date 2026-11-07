@@ -211,10 +211,19 @@ action.
   - **Connector termini:** a connector terminus must stand somewhere (not held).
 - `put-connector`: the single put-down. Sets the held connector down at a reachable
   location, converts every `selected` fact into a `paired` fact, and clears the selections.
-  Without selections it adds no pairings.
-  - **Placement restriction (with selections):** `connectable-location` forbids placement
-    where another connector is already lit, and the placement location may not hold a
-    selected connector terminus.
+  Without selections it adds no pairings. It has no placement restriction of its own; the
+  state invariant below decides, whether the pairings were kept or newly selected.
+
+**State invariant: no two active connectors at one location.** A model location is an
+idealized point standing for a small region where several connectors can sit. In the game
+two connectors there are slightly apart, so whether their beams cross depends on an offset
+the model lacks. Any settled state in which a location holds two active connectors (same
+recorder layer) is discarded, whatever action or update produced it: the game refuses a
+put-down that would make the connector active beside an active one, and any later change
+that would activate a connector beside an active one. An inactive connector carries no
+beams, so it may be put down beside an active one. Two connectors at one location sit side
+by side, so a link between them is always clear. If the idealization matters for a
+problem, add a nearby location with its own coordinates.
 
 **Lighting** (`compute-relay-lighting`). Hues spread breadth-first from the transmitters,
 one relay link per layer.
@@ -222,7 +231,9 @@ one relay link per layer.
 - A link carries a hue only if it is paired, beam-visible, and not cut.
 - A relay reached in one layer by a single hue takes that hue. If two different hues reach
   it in the same layer, it stays unlit. Hues arriving in later layers are ignored.
-- Only one lit connector counts per location.
+- A connector reached by a single hue at a location already holding a lit connector is a
+  clash (`connector-location-clash`), and the state is discarded after propagation. Live
+  and ghost connectors never clash.
 - A receiver is active when a relay of its chroma is paired with it and has a visible,
   uncut beam to it.
 

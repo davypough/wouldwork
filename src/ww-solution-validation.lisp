@@ -378,7 +378,10 @@ it prints nothing and returns T."
                             (return-from %apply-action-to-state
                               (values nil nil "Happening violation (kill condition)")))
                           (setf new-state net-state)))
-                      
+                      ;; A state the search would drop (eg, a technology state invariant)
+                      (when (state-is-inconsistent new-state)
+                        (return-from %apply-action-to-state
+                          (values nil nil "Inconsistent state (dropped by search)")))
                       (return-from %apply-action-to-state
                         (values new-state t nil))))))))))
       

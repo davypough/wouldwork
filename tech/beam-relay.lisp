@@ -13,6 +13,15 @@
 ;;; this peer with beam-direct and visibility so fixed corridors and apparatus sightlines
 ;;; are live.
 ;;;
+;;; State invariant: no location may hold two active connectors on the same recording
+;;; side.  A model location is an idealized point standing for a small region; in the game
+;;; two connectors there sit slightly apart, so whether their beams cross depends on an
+;;; offset the model lacks.  Lighting records a CONNECTOR-LOCATION-CLASH wherever a
+;;; connector would light at a location already holding a lit same-side connector, and
+;;; PROPAGATION-INVARIANT-VIOLATED makes any settled state with a clash inconsistent,
+;;; whatever action or update produced it.  An inactive connector carries no beams and
+;;; never clashes, so it may be put down beside an active one.
+;;;
 ;;; REQUIRES:
 ;;;   types      : agent, location -- connector/transmitter/receiver/repeater and related
 ;;;                leaf types are optional through the nested roles
@@ -30,7 +39,7 @@
 ;;;   types      : relay (either connector floor-repeater wall-repeater);
 ;;;                terminus (either transmitter receiver connector floor-repeater
 ;;;                wall-repeater)
-;;;   relations  : paired, selected, color
+;;;   relations  : paired, selected, color, connector-location-clash
 ;;;   queries    : relay-beam-reaches-receiver,
 ;;;                recording-shadow-relay-beam-reaches-receiver,
 ;;;                compute-relay-lighting, compute-relay-lighting-for-object,
@@ -38,7 +47,9 @@
 ;;;                relay-link-clear, relay-link-clear-for-object,
 ;;;                paired-relay-visible, paired-relay-visible-for-object,
 ;;;                relay-beam-live-for-cutting, beam-relay-source-distance,
-;;;                connectable-location, connectable-terminus, connector-link-count
+;;;                compute-relay-lighting-and-clashes, lit-connector-clash,
+;;;                connectable-terminus, connector-link-count;
+;;;                overrides propagation-invariant-violated (-propagation)
 ;;;   updates    : update-relay-status!
 ;;;   actions    : pickup-connector, pickup-connector-retaining-pairings,
 ;;;                put-connector, select-termini
@@ -72,11 +83,12 @@
 (define-dynamic-relations
   (paired connector terminus)
   (selected connector terminus)
-  (color relay $hue))
+  (color relay $hue)
+  (connector-location-clash location))
 
 
 (define-derived-relations
-  color)
+  color connector-location-clash)
 
 
 ;; PAIRED's contribution to the recorder's ghost fork, registered here because this file
@@ -172,19 +184,13 @@
 
 (define-action put-connector
   ;; The single put-down.  Every pending selection becomes a PAIRED fact and is cleared.
-  ;; With selections, the placement location must hold no lit other connector and no
-  ;; selected connector terminus; without them this is a plain put-down.
+  ;; A put-down that would leave two active connectors at one location is discarded by
+  ;; the state invariant after propagation, whether the pairings were kept or selected.
   1
   (?agent agent ?connector connector ?location location)
   (and (holding ?agent ?connector)
        (bind (has-location ?agent $a-location))
        (reachable ?location $a-location)
-       (or (not (exists (?t terminus)
-                  (selected ?connector ?t)))
-           (and (connectable-location ?connector ?location)
-                (not (exists (?c connector)
-                       (and (selected ?connector ?c)
-                            (has-location ?c ?location))))))
        (assign $places (placement-options ?agent ?location ?connector)))
   (">" ?agent "puts" ?connector "on" $place "at" ?location)
   (ww-loop for $placement-option in $places
@@ -228,13 +234,22 @@
 
 
 (define-update update-relay-status! ()
-  (do (assign $lighting (compute-relay-lighting (current-crossing-set)))
+  ;; Clash facts are derived like COLOR, so they settle with the fixpoint;
+  ;; PROPAGATION-INVARIANT-VIOLATED reads them only after convergence.
+  (do (assign $result
+              (compute-relay-lighting-and-clashes nil (current-crossing-set)))
+      (assign $lighting (first $result))
+      (assign $clashes (second $result))
       (doall (?relay relay)
         (do (assign $record (assoc ?relay $lighting))
             (if $record
               (color ?relay (second $record))
               (if (bind (color ?relay $old-hue))
-                (not (color ?relay $old-hue))))))))
+                (not (color ?relay $old-hue))))))
+      (doall (?location location)
+        (if (member ?location $clashes)
+          (connector-location-clash ?location)
+          (not (connector-location-clash ?location))))))
 
 
 ;;;; QUERY FUNCTIONS ;;;;
@@ -289,10 +304,24 @@
   (compute-relay-lighting-for-object nil ?active))
 
 
+(define-query propagation-invariant-violated ()
+  ;; Read once after PROPAGATE-CHANGES! converges: a settled clash discards the state.
+  (exists (?location location)
+    (connector-location-clash ?location)))
+
+
 (define-query compute-relay-lighting-for-object (?view ?active)
+  (first (compute-relay-lighting-and-clashes ?view ?active)))
+
+
+(define-query compute-relay-lighting-and-clashes (?view ?active)
   ;; Breadth-first propagation from every transmitter.  Each lighting record is
   ;; (relay hue distance); frontier records additionally carry the relay's beam endpoint.
+  ;; Returns (lighting clashes).  A single-hue connector reaching a location already lit
+  ;; by another connector stays unlit; when that lit connector is on its recording side,
+  ;; the location is also recorded as a clash.
   (do (assign $lit nil)
+      (assign $clashes nil)
       ;; The view class is invariant throughout propagation.
       (assign $recording-view-p (recording-shadow-object ?view))
       (assign $lit-locations nil)
@@ -353,11 +382,32 @@
                                                             $target-anchor
                                                             $reach-hue
                                                             $reach-distance)
-                                                      $next-frontier)))))))))))
+                                                      $next-frontier)))
+                                        (if (and (not (cdr $hues))
+                                                 (not (member $target-anchor
+                                                              $clashes))
+                                                 (lit-connector-clash
+                                                   ?target $target-anchor $lit))
+                                          (assign $clashes
+                                                  (cons $target-anchor
+                                                        $clashes)))))))))))
                   (assign $frontier $next-frontier)
                   (if (not $frontier)
                     (return t)))
-      $lit))
+      (list $lit $clashes)))
+
+
+(define-query lit-connector-clash (?connector ?anchor ?lighting)
+  ;; True when a connector already lit in ?LIGHTING stands at ?ANCHOR on ?CONNECTOR's
+  ;; recording side.  Live and ghost copies never clash (CONNECTOR-LOCATION-CONFLICT-P).
+  (do (assign $clash nil)
+      (ww-loop for $record in ?lighting
+               do (assign $other (first $record))
+                  (if (and (connector $other)
+                           (eql (relay-anchor $other) ?anchor)
+                           (connector-location-conflict-p ?connector $other))
+                    (assign $clash t)))
+      $clash))
 
 
 (define-query relay-anchor (?relay relay)
@@ -423,15 +473,19 @@
      ?target relay
      ?target-anchor beam-node)
   ;; A paired link always has at least one connector.  BEAM-VISIBLE is location-first, so
-  ;; orient the test from whichever endpoint is the connector.
-  (if (connector ?target)
-    (beam-visible-for-object
-      ?view ?target-anchor (top ?target)
-      ?source-anchor (top ?source))
-    (do (connector ?source)
-        (beam-visible-for-object
-          ?view ?source-anchor (top ?source)
-          ?target-anchor (top ?target)))))
+  ;; orient the test from whichever endpoint is the connector.  Two connectors at one
+  ;; location sit side by side in the game, so their link is always clear; a beam along it
+  ;; makes both active there, which the state invariant then discards.
+  (if (eql ?source-anchor ?target-anchor)
+    t
+    (if (connector ?target)
+      (beam-visible-for-object
+        ?view ?target-anchor (top ?target)
+        ?source-anchor (top ?source))
+      (do (connector ?source)
+          (beam-visible-for-object
+            ?view ?source-anchor (top ?source)
+            ?target-anchor (top ?target))))))
 
 
 (define-query relay-beam-live-for-cutting
@@ -483,14 +537,6 @@
       most-positive-fixnum)))
 
 
-(define-query connectable-location (?connector connector ?location location)
-  (not (exists (?other connector)
-         (and (different ?other ?connector)
-              (connector-location-conflict-p ?connector ?other)
-              (has-location ?other ?location)
-              (bind (color ?other $hue))))))
-
-
 (define-query connectable-terminus
     (?agent agent
      ?vantage location
@@ -500,7 +546,8 @@
   ;; Exact placement and live visibility later decide whether the beam carries color.
   ;; A terminus already linked to or selected by the connector is not offered again.
   ;; A connector terminus must stand somewhere (not held) and have room under
-  ;; *max-connector-pairings*.  Same-location connector pairs are excluded at put-down.
+  ;; *max-connector-pairings*.  A same-location connector pair can carry a beam only
+  ;; with both connectors active there, which the state invariant discards.
   (and (connector-pairing-allowed ?agent ?connector ?terminus)
        (not (paired ?connector ?terminus))
        (not (selected ?connector ?terminus))

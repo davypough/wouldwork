@@ -45,8 +45,8 @@ Maximum search depth: 6 per search (threads 16, min-length), set by D 2026-09-27
    - transmitter2->location4 crosses transmitter1->location1, location2->receiver1, location3->receiver1,
      location1->location2, location1->location3
    So the red and blue paths cannot be chosen independently.
-3. A connector lit by two different hues is unlit. A connector cannot be connected at a location already holding a
-   lit connector (connectable-location).
+3. A connector lit by two different hues is unlit. No state may hold two active connectors at one location
+   (beam-relay state invariant).
 4. Bodies occlude beams, e.g. a body at location1 blocks location4->transmitter2 (S6 kill list).
 
 ## Contracts

@@ -9,19 +9,15 @@
 ;;;      eligible choices at *MAX-CONNECTOR-PAIRINGS* = 2, and PUT-CONNECTOR pairing them at
 ;;;      put-down, then propagating color to a receiver.
 ;;;   3. PUT-CONNECTOR placing an independently held connector on a plate without pairings.
-;;;   4. CONNECTABLE-LOCATION rejecting a site occupied by a lit connector while accepting
-;;;      sites occupied only by unlit connectors.
+;;;   4. Unlit connectors beside the final lifecycle connector (TARGET-UNLIT-CONNECTOR) and
+;;;      elsewhere staying unlit.  Put-downs beside active connectors are covered by
+;;;      problem-connector-clash-test.lisp.
 ;;;   5. CONNECTABLE-TERMINUS using structural visibility: a transmitter behind a closed
 ;;;      gate is eligible for selection but not live visibility.  A no-LOS transmitter, the
 ;;;      connector itself, and a terminus the connector is already linked to are rejected.
 ;;;   6. A selection surviving a one-way drop: drop-agent selects ledge-source from LEDGE,
 ;;;      jumps down a directed edge to FLOOR, from which ledge-source is not even
 ;;;      structurally visible, and puts down there.  The pairing forms but carries no color.
-;;;   7. PUT-CONNECTOR refusing a put-down at the location of a selected connector terminus:
-;;;      a stationary probe whose held connector already selects SITE-CONNECTOR, checked on
-;;;      the generated put-down children of the start state.  Put-down at PROBE-SITE, where
-;;;      SITE-CONNECTOR stands, is absent; put-down at PROBE-ALT pairs and clears the
-;;;      selection.
 ;;;
 ;;; Initial state: lifecycle-connector rests on old-plate at origin, paired outward to
 ;;; old-source and named inward by incoming-connector; placement-connector is held by
@@ -32,7 +28,7 @@
 ;;; incoming, decoy, self, and other unintended pairings remain absent.
 ;;; placement-connector rests unpaired and unlit on put-plate, depressing it.
 ;;; drop-connector rests at floor, paired to ledge-source and unlit.  Neither connector
-;;; retains a SELECTED fact.  The stationary probe is unconstrained by the goal.
+;;; retains a SELECTED fact.
 ;;;
 ;;; Expected minimum solution (7 steps): PICKUP-CONNECTOR, SELECT-TERMINI and
 ;;; PUT-CONNECTOR for the lifecycle fixture; PUT-CONNECTOR for the independent fixture;
@@ -62,14 +58,13 @@
 
 
 (define-types
-  agent (relay-agent put-agent drop-agent probe-agent)
+  agent (relay-agent put-agent drop-agent)
   location (origin target old-view incoming-site
-            put-origin put-site lit-site dark-site ledge floor
-            probe-origin probe-site probe-alt)
+            put-origin put-site lit-site dark-site ledge floor)
   pressure-plate (old-plate put-plate)
   connector (lifecycle-connector incoming-connector placement-connector
              lit-blocker-connector dark-connector target-unlit-connector
-             drop-connector probe-connector site-connector)
+             drop-connector)
   transmitter (old-source new-source decoy-source invisible-source blocker-source
                ledge-source)
   receiver (new-receiver)
@@ -122,13 +117,12 @@
   (los-via target () new-receiver)
   (los-via target (closed-gate) decoy-source)
 
-  ;; An unlit connector already at TARGET does not block placement, but is not itself a
-  ;; connectable terminus there because connector-to-connector links require distinct
-  ;; locations.  DARK-CONNECTOR supplies the same unlit-location positive branch elsewhere.
+  ;; An unlit connector already at TARGET does not block placement and stays unlit beside
+  ;; the lit lifecycle connector.  DARK-CONNECTOR is unlit elsewhere.
   (has-location target-unlit-connector target)
   (has-location dark-connector dark-site)
 
-  ;; A separately lit connector makes LIT-SITE unavailable to another connector.
+  ;; A separately lit connector at LIT-SITE.
   (has-location lit-blocker-connector lit-site)
   (paired lit-blocker-connector blocker-source)
   (has-chroma blocker-source green)
@@ -145,16 +139,7 @@
   (holding drop-agent drop-connector)
   (traverse-via> ledge ((drop-edge)) floor)
   (has-chroma ledge-source blue)
-  (los-via ledge () ledge-source)
-  ;; Same-site put-down probe.  It remains stationary; a claim inspects the start state's
-  ;; generated PUT-CONNECTOR children.  The selection is authored directly because no
-  ;; sightline is needed to test the put-down restriction.
-  (has-location probe-agent probe-origin)
-  (holding probe-agent probe-connector)
-  (selected probe-connector site-connector)
-  (has-location site-connector probe-site)
-  (reach-via probe-origin () probe-site)
-  (reach-via probe-origin () probe-alt))
+  (los-via ledge () ledge-source))
 
 
 (define-init-action initialize-derived-state
@@ -208,16 +193,15 @@
     (not (exists (?h hue)
            (color placement-connector ?h)))
 
-    ;; A different lit connector blocks its site.  Unlit occupants do not block either
-    ;; DARK-SITE or TARGET, even though TARGET already contains another connector.
+    ;; A separately lit connector, and unlit connectors elsewhere and beside the lit
+    ;; lifecycle connector at TARGET.
     (color lit-blocker-connector green)
-    (not (connectable-location lifecycle-connector lit-site))
     (not (exists (?h hue)
            (color dark-connector ?h)))
-    (connectable-location lifecycle-connector dark-site)
     (not (exists (?h hue)
            (color target-unlit-connector ?h)))
-    (connectable-location lifecycle-connector target)
+    (not (exists (?l location)
+           (connector-location-clash ?l)))
 
     ;; Structural pairing eligibility versus live beam visibility, plus negative branches.
     (potentially-visible origin decoy-source)
@@ -249,47 +233,7 @@
                (selected drop-connector ?t))))))
 
 
-;;;; GENERATED-CHILD CHARACTERIZATION ;;;;
-
-
-(define-test-claim beam-relay-selected-connector-site-put-down
-  ;; No put-down lands the probe connector beside its selected connector terminus.
-  (notany (lambda (child)
-            (beam-relay-child-matches-p
-              child
-              '((has-location probe-connector probe-site))
-              nil))
-          (beam-relay-put-connector-children *start-state*))
-  ;; Elsewhere the put-down is offered, converts the selection into a pairing, and
-  ;; clears it.
-  (some (lambda (child)
-          (beam-relay-child-matches-p
-            child
-            '((has-location probe-connector probe-alt)
-              (paired probe-connector site-connector))
-            '((selected probe-connector site-connector))))
-        (beam-relay-put-connector-children *start-state*)))
-
-
-(define-test-helper beam-relay-put-connector-children (state)
-  "Return STATE's generated PUT-CONNECTOR children."
-  (let ((put-action (find 'put-connector *actions* :key #'action.name))
-        (saved-dropped-count *inconsistent-states-dropped*))
-    (unwind-protect
-      (let ((*actions* (list put-action)))
-        (generate-children
-          (make-node :state state :depth 0)))
-      (setf *inconsistent-states-dropped* saved-dropped-count))))
-
-
-(define-test-helper beam-relay-child-matches-p (child required-facts absent-facts)
-  (let ((facts (database child)))
-    (and (every (lambda (fact)
-                  (member fact facts :test #'equal))
-                required-facts)
-         (notany (lambda (fact)
-                   (member fact facts :test #'equal))
-                 absent-facts))))
+;;;; CLAIMS ;;;;
 
 
 (define-test-claim beam-relay-pairing-limit-override

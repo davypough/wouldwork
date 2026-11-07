@@ -172,22 +172,19 @@
 
 
 (define-test-claim recorder-isolation-connector-location-layering
-  (let ((probe-state (copy-problem-state *start-state*)))
-    (add-proposition
-      '(color live-lit-blocker-connector blue)
-      (problem-state.idb probe-state))
-    (add-proposition
-      '(color ghost-lit-blocker-connector blue)
-      (problem-state.idb probe-state))
+  ;; With both blockers lit, a connector clashes only with the lit blocker of its own
+  ;; recorder layer.
+  (let ((lighting '((live-lit-blocker-connector blue 1)
+                    (ghost-lit-blocker-connector blue 1))))
     (and
-      (not (connectable-location
-             probe-state 'live-pair-connector 'live-lit-site))
-      (connectable-location
-        probe-state 'ghost-pair-connector 'live-lit-site)
-      (connectable-location
-        probe-state 'live-pair-connector 'ghost-lit-site)
-      (not (connectable-location
-             probe-state 'ghost-pair-connector 'ghost-lit-site)))))
+      (lit-connector-clash
+        *start-state* 'live-pair-connector 'live-lit-site lighting)
+      (not (lit-connector-clash
+             *start-state* 'ghost-pair-connector 'live-lit-site lighting))
+      (not (lit-connector-clash
+             *start-state* 'live-pair-connector 'ghost-lit-site lighting))
+      (lit-connector-clash
+        *start-state* 'ghost-pair-connector 'ghost-lit-site lighting))))
 
 
 (define-test-claim recorder-isolation-validation

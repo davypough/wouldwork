@@ -1620,23 +1620,23 @@ settings change. No problem object is named in code (C3).
   connector or on a connector terminus, and never for a terminus it is
   already linked to or has selected; selections survive later moves.
   PUT-CONNECTOR places the held connector at a location the agent reaches
-  and converts every selection into a PAIRED fact, never at the location of
-  a selected connector terminus; without selections it places without
-  pairing.
+  and converts every selection into a PAIRED fact; without selections it
+  places without pairing.
 - *Requires*: lighting runs in propagation layers from every transmitter
   (layer 0). A relay settles in the first layer in which any clear link
   from a lit source reaches it: one hue lights it; two or more hues in that
   layer leave it dark, and a dark relay feeds nothing; any hue arriving in
-  a later layer is ignored. A connector is also dark when a connector at its
-  location is already lit. A clear link is a stored PAIRED fact in either
+  a later layer is ignored. A single-hue connector at a location where a
+  connector of the same recorder layer is already lit is a clash, and the
+  settled state is discarded (state invariant); two connectors at one
+  location have an always-clear link. A clear link is a stored PAIRED fact in either
   direction (COUPLED for fixed apparatus), a live sightline in the reading
   view, and no cut by an active crossing (physical view only). Pairings
   persist while their beam is blocked or cut; only pickup clears them.
   Capacity counts every link and pending selection naming a connector,
   either direction, retained links included. A receiver is reached only by a relay of its hue whose own
   outgoing pairing (or coupling) names it, visible and uncut; beam-direct
-  may reach it independently. PUT-CONNECTOR with selections needs no lit
-  connector of the same recorder layer at the placement location. Layers are propagation
+  may reach it independently. Layers are propagation
   order, not travel time or action order.
 
 **Static instance rows (grade 1, candidates grade 2).** Under the contract:
