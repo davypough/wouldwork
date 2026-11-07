@@ -231,9 +231,10 @@ one relay link per layer.
 - A link carries a hue only if it is paired, beam-visible, and not cut.
 - A relay reached in one layer by a single hue takes that hue. If two different hues reach
   it in the same layer, it stays unlit. Hues arriving in later layers are ignored.
-- A connector reached by a single hue at a location already holding a lit connector is a
-  clash (`connector-location-clash`), and the state is discarded after propagation. Live
-  and ghost connectors never clash.
+- A connector reached by a single hue at a location already holding a lit connector of its
+  own recorder layer stays dark and is a clash (`connector-location-clash`); the state is
+  discarded after propagation. A lit connector of the other layer does not darken it: live
+  and ghost connectors at one location light independently and never clash.
 - A receiver is active when a relay of its chroma is paired with it and has a visible,
   uncut beam to it.
 

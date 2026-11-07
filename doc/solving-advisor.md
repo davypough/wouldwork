@@ -692,7 +692,7 @@ Their contracts are in `doc/constraint-led-solving/Extractor-Specifications.md`.
 - **Supplied relay lighting:** `(report-relay-lighting-scenario (list :state <state> :provenance "<text>"))`,
   optionally `:view :recording` (open cycle only) and `:chains <chains> :phase <phase>` for T33's
   verdicts, replays one settled state's lighting by propagation layer: each relay LIT, CONFLICT,
-  LOCATION ALREADY LIT, UNREACHED or ABSENT; each stored link's sightline, cut and outcome
+  SAME-SIDE CONNECTOR ALREADY LIT HERE (a clash), UNREACHED or ABSENT; each stored link's sightline, cut and outcome
   (DELIVERED, IGNORED later, SOURCE DARK, NOT CLEAR); outgoing/incoming capacity; receivers,
   with engine agreement checked (specification 8.11). For that state only.
 - **Supplied equipment:** `(report-equipment-scenario (list :state <state> :provenance "<text>"))`,
@@ -750,9 +750,12 @@ is breadth-first: a relay keeps the hue that reaches it first and ignores later
 ones (two hues in the same step leave it unlit), so one relay can pass a relayed
 hue while its direct feed is cut and its own hue once the feed is restored.
 Pairings persist while their beam is blocked or cut; only pickup clears them (the
-retaining pickup keeps them, but a held connector carries no beam). Capacity counts
-a connector's outgoing pairings only. A connector at a location whose connector is
-already lit stays dark. A receiver needs a relay of its hue whose own pairing names it.
+retaining pickup keeps them, but a held connector carries no beam). Capacity
+(`*max-connector-pairings*`) counts a connector's pairings and pending selections in both
+directions, retained links included, and binds a connector terminus too. A connector
+reached at a location where a connector of its own recorder layer is already lit is a
+clash, and the state is discarded; live and ghost connectors at one location light
+independently. A receiver needs a relay of its hue whose own pairing names it.
 
 ## Directory and development history
 

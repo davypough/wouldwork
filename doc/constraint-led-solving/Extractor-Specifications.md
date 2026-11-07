@@ -1674,7 +1674,7 @@ engine does):
 
 - *Layers*: the propagation replayed layer by layer through the engine's
   link query, each relay with its layer, its arrivals (source, hue) and a
-  verdict: LIT hue, CONFLICT (hues), LOCATION ALREADY LIT, UNREACHED, or
+  verdict: LIT hue, CONFLICT (hues), SAME-SIDE CONNECTOR ALREADY LIT HERE (a clash), UNREACHED, or
   ABSENT (no location, or not present in the recording view).
 - *Links*: per relay, every stored pairing or coupling touching it, as
   owned (outgoing) or incoming, with sightline (CLEAR or BLOCKED), cut

@@ -318,13 +318,12 @@
   ;; Breadth-first propagation from every transmitter.  Each lighting record is
   ;; (relay hue distance); frontier records additionally carry the relay's beam endpoint.
   ;; Returns (lighting clashes).  A single-hue connector reaching a location already lit
-  ;; by another connector stays unlit; when that lit connector is on its recording side,
-  ;; the location is also recorded as a clash.
+  ;; by a connector on its own recording side stays unlit, and the location is recorded as
+  ;; a clash.  Live and ghost connectors at one location light independently.
   (do (assign $lit nil)
       (assign $clashes nil)
       ;; The view class is invariant throughout propagation.
       (assign $recording-view-p (recording-shadow-object ?view))
-      (assign $lit-locations nil)
       (assign $visited nil)
       (assign $frontier nil)
       (doall (?transmitter transmitter)
@@ -360,37 +359,26 @@
                                                           (1+ $source-distance)))))
                                 (if $hues
                                   (do (assign $visited (cons ?target $visited))
-                                      (if (and (not (cdr $hues))
-                                               (or (repeater ?target)
-                                                   (not (member
-                                                          $target-anchor
-                                                          $lit-locations))))
-                                        (do (assign $lit
-                                                    (cons
-                                                      (list ?target
-                                                            $reach-hue
-                                                            $reach-distance)
-                                                      $lit))
-                                            (if (connector ?target)
-                                              (assign $lit-locations
-                                                      (cons
-                                                        $target-anchor
-                                                        $lit-locations)))
-                                            (assign $next-frontier
-                                                    (cons
-                                                      (list ?target
-                                                            $target-anchor
-                                                            $reach-hue
-                                                            $reach-distance)
-                                                      $next-frontier)))
-                                        (if (and (not (cdr $hues))
-                                                 (not (member $target-anchor
-                                                              $clashes))
+                                      (if (not (cdr $hues))
+                                        (if (and (connector ?target)
                                                  (lit-connector-clash
                                                    ?target $target-anchor $lit))
-                                          (assign $clashes
-                                                  (cons $target-anchor
-                                                        $clashes)))))))))))
+                                          (if (not (member $target-anchor $clashes))
+                                            (assign $clashes
+                                                    (cons $target-anchor $clashes)))
+                                          (do (assign $lit
+                                                      (cons
+                                                        (list ?target
+                                                              $reach-hue
+                                                              $reach-distance)
+                                                        $lit))
+                                              (assign $next-frontier
+                                                      (cons
+                                                        (list ?target
+                                                              $target-anchor
+                                                              $reach-hue
+                                                              $reach-distance)
+                                                        $next-frontier))))))))))))
                   (assign $frontier $next-frontier)
                   (if (not $frontier)
                     (return t)))

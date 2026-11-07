@@ -4481,16 +4481,17 @@ counted as layer-blind roots."
           collect (list source hue)))
 
 
-(defun relay-light-settle (state selector target anchor frontier active lit-locations layer)
+(defun relay-light-settle (state selector target anchor frontier active lit layer)
   "TARGET's record for this layer, or NIL when nothing reaches it: (RELAY LAYER ARRIVALS
-   VERDICT HUE).  The engine's order of tests: two hues, then an already lit location."
+   VERDICT HUE).  The engine's order of tests: two hues, then a same-side connector
+   already lit at the location (LIT holds the engine-form records lit so far)."
   (let ((arrivals (relay-light-arrivals state selector target anchor frontier active)))
     (when arrivals
       (let ((hues (remove-duplicates (mapcar #'second arrivals))))
         (cond ((rest hues) (list target layer arrivals :conflict nil))
               ((and (member target (census-type-instances 'connector))
-                    (member anchor lit-locations))
-               (list target layer arrivals :location-lit nil))
+                    (relay-view-call 'lit-connector-clash state target anchor lit))
+               (list target layer arrivals :clash nil))
               (t (list target layer arrivals :lit (first hues))))))))
 
 
@@ -4501,7 +4502,7 @@ counted as layer-blind roots."
    within a layer resolves as the engine resolves it."
   (let ((frontier (relay-light-initial-frontier))
         (records nil)
-        (lit-locations nil))
+        (lit nil))
     (loop for layer from 1 to 99
           while frontier
           do (let ((next nil))
@@ -4510,12 +4511,11 @@ counted as layer-blind roots."
                    (let ((anchor (relay-light-anchor state selector target)))
                      (when anchor
                        (let ((record (relay-light-settle state selector target anchor frontier
-                                                         active lit-locations layer)))
+                                                         active lit layer)))
                          (when record
                            (push record records)
                            (when (eq (fourth record) :lit)
-                             (when (member target (census-type-instances 'connector))
-                               (push anchor lit-locations))
+                             (push (list target (fifth record) layer) lit)
                              (push (list target anchor (fifth record) layer) next))))))))
                (setf frontier next)))
     (dolist (relay (census-type-instances 'relay))
@@ -4718,7 +4718,7 @@ counted as layer-blind roots."
     (:lit (format nil "LIT ~(~A~)" (fifth record)))
     (:conflict (format nil "CONFLICT ~(~S~), dark"
                        (remove-duplicates (mapcar #'second (third record)))))
-    (:location-lit "LOCATION ALREADY LIT, dark")
+    (:clash "SAME-SIDE CONNECTOR ALREADY LIT HERE, dark (clash)")
     (:unreached "UNREACHED")
     (:absent "ABSENT (no location in this view)")))
 

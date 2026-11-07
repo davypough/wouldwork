@@ -38,15 +38,17 @@
   connector (live-place-connector ghost-place-connector
              live-pair-connector ghost-pair-connector
              live-target-connector ghost-target-connector
-             live-lit-blocker-connector ghost-lit-blocker-connector)
+             live-lit-blocker-connector ghost-lit-blocker-connector
+             live-shared-lit-connector ghost-shared-lit-connector)
   tray (live-held-tray ghost-held-tray
         live-ground-tray ghost-ground-tray)
   recorder (recorder1)
   pressure-plate (shared-plate)
   transmitter (shared-transmitter)
+  hue (blue)
   location (pickup-site place-site pair-origin
             live-target-site ghost-target-site landing-site
-            live-lit-site ghost-lit-site)
+            live-lit-site ghost-lit-site shared-lit-site)
   edge (pickup-edge))
 
 
@@ -80,6 +82,7 @@
   (recording-copy> live-pair-connector ghost-pair-connector)
   (recording-copy> live-target-connector ghost-target-connector)
   (recording-copy> live-lit-blocker-connector ghost-lit-blocker-connector)
+  (recording-copy> live-shared-lit-connector ghost-shared-lit-connector)
   (recording-copy> live-held-tray ghost-held-tray)
   (recording-copy> live-ground-tray ghost-ground-tray)
 
@@ -139,7 +142,16 @@
 
   ;; Lit connector occupancy conflicts only within its own recorder layer.
   (has-location live-lit-blocker-connector live-lit-site)
-  (has-location ghost-lit-blocker-connector ghost-lit-site))
+  (has-location ghost-lit-blocker-connector ghost-lit-site)
+
+  ;; Cross-layer lighting: a live and a ghost connector at one location, both paired with
+  ;; the blue transmitter, light independently.
+  (has-chroma shared-transmitter blue)
+  (has-location live-shared-lit-connector shared-lit-site)
+  (has-location ghost-shared-lit-connector shared-lit-site)
+  (paired live-shared-lit-connector shared-transmitter)
+  (paired ghost-shared-lit-connector shared-transmitter)
+  (los-via shared-lit-site () shared-transmitter))
 
 
 ;;;; CHARACTERIZATION HELPERS ;;;;
@@ -163,6 +175,7 @@
     (recording-copy> live-pair-connector ghost-pair-connector)
     (recording-copy> live-target-connector ghost-target-connector)
     (recording-copy> live-lit-blocker-connector ghost-lit-blocker-connector)
+    (recording-copy> live-shared-lit-connector ghost-shared-lit-connector)
     (recording-copy> live-held-tray ghost-held-tray)
     (recording-copy> live-ground-tray ghost-ground-tray)))
 
@@ -185,6 +198,17 @@
              *start-state* 'live-pair-connector 'ghost-lit-site lighting))
       (lit-connector-clash
         *start-state* 'ghost-pair-connector 'ghost-lit-site lighting))))
+
+
+(define-test-claim recorder-isolation-cross-side-lighting
+  ;; A live and a ghost connector at one location, both reached by the single blue hue,
+  ;; are both lit with no clash: lighting darkens a connector only beside a lit one on its
+  ;; own recording side.
+  (let* ((result (compute-relay-lighting-and-clashes *start-state* nil nil))
+         (lighting (first result)))
+    (and (assoc 'live-shared-lit-connector lighting)
+         (assoc 'ghost-shared-lit-connector lighting)
+         (null (second result)))))
 
 
 (define-test-claim recorder-isolation-validation
