@@ -326,10 +326,21 @@
 
 
 (define-query potentially-visible
-    (?location location ?object visibility-object)
-  ;; Structural LOS ignores whether its authored gate occluders are currently open.  Relay
-  ;; pairing selection uses this; operational sight uses one of the policies above.
-  (bind (los-via ?location $occluders ?object)))
+    (?location location ?near-elevation ?object visibility-object ?far-elevation)
+  ;; Structural sight, used by relay terminus selection; operational sight uses one of the
+  ;; policies above.  Gates are ignored, open or closed, since a closed gate can open later,
+  ;; and bodies never block.  A wall, edge or boundary segment blocks unless a beam between
+  ;; the two elevations clears it.  A hand-authored LOS fact keeps its gate-only behavior.
+  (do (assign $visible nil)
+      (if (bind (los-via ?location $occluders ?object))
+        (do (assign $crossings (los-barrier-crossings ?location ?object))
+            (assign $visible
+                    (or (eql $crossings :unrecorded)
+                        (ww-loop for $crossing in $crossings
+                                 always (or (eql (first $crossing) :gate)
+                                            (barrier-crossing-clear-for-object
+                                              nil $crossing ?near-elevation ?far-elevation)))))))
+      $visible))
 
 
 (define-query visible-clear (?occluder gate)

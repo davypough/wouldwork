@@ -160,6 +160,17 @@
           collect (cons (fifth record) (first record))))
 
 
+(defun beam-coordinates-location-parameter (beam location positions)
+  ;; LOCATION's projection parameter along BEAM: 0 at its first endpoint, 1 at its second.
+  (let ((position1 (beam-coordinates-position (first beam) positions))
+        (position2 (beam-coordinates-position (second beam) positions))
+        (position3 (beam-coordinates-position location positions)))
+    (beam-coordinates-projection-parameter
+      (first position1) (second position1)
+      (first position2) (second position2)
+      (first position3) (second position3))))
+
+
 (defun beam-coordinates-split-crossings-at-parameter (beam records split-parameter)
   ;; Splits BEAM's crossings (drawn from RECORDS, the same beam-crossing intersection
   ;; records BEAM-COORDINATES-CROSSING-RECORDS computes) at SPLIT-PARAMETER -- the point
@@ -280,7 +291,12 @@
                  do (crossings-coincide> (first $pair) (second $pair))
                     (crossings-coincide> (second $pair) (first $pair)))
         (ww-loop for $beam in $beams
-                 do (assign $beam-crossings
+                 do (ww-loop for $pc in (beam-coordinates-parameter&crossings $beam $records)
+                             do (crossing-parameter>
+                                  (cdr $pc) (first $beam) (second $beam) (car $pc))
+                                (crossing-parameter>
+                                  (cdr $pc) (second $beam) (first $beam) (- 1 (car $pc))))
+                    (assign $beam-crossings
                             (beam-coordinates-crossings-on-beam $beam $records))
                     (if $beam-crossings
                       (do (crossings-along-beam>
@@ -292,6 +308,18 @@
                             (crossings-along-beam>
                               (second $beam) (reverse $beam-crossings)
                               (first $beam))))))
+        (ww-loop for $beam in $beams
+                 do (if (bind (los-via (first $beam) $occluders (second $beam)))
+                      (ww-loop for $occluder in $occluders
+                               do (if (member $occluder (gethash 'location *types*))
+                                    (do (assign $parameter
+                                                (beam-coordinates-location-parameter
+                                                  $beam $occluder $positions))
+                                        (occluder-parameter>
+                                          $occluder (first $beam) (second $beam) $parameter)
+                                        (occluder-parameter>
+                                          $occluder (second $beam) (first $beam)
+                                          (- 1 $parameter)))))))
         (convert-databases-to-integers))))
 
 

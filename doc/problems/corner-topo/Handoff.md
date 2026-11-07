@@ -1,9 +1,39 @@
 # corner-topo — Handoff
-Updated 2026-11-06.  Status: UNSOLVABLE under the connector link cap (*max-connector-pairings* 3,
-incoming links counted, 2026-11-05).  The 15-step Actions.lisp below predates the cap and the
+Updated 2026-11-07.  Status: UNSOLVABLE under the connector pairing cap (*max-connector-pairings* 3,
+pairings on either side counted, 2026-11-05) -- PROVEN 2026-11-07 by exhaustive backward
+enumeration (below).  The 15-step Actions.lisp below predates the cap and the
 select-termini/put-connector split; it no longer replays (fails at step 13) and is kept as history.
 
-## Unsolvable under the cap (2026-11-06)
+## Proof by backward enumeration (2026-11-07)
+Spec probs/problem-corner-topo-advisor.lisp (same rules; enumerator declarations: base relations
+has-location, holding, paired, selected; selected shares the cap of 3 with paired and exists only
+for the held connector; state-feasible? enforces the rules on those facts; a goal-only filter
+requires placed connectors paired in structural sight with receiver2, receiver3, transmitter1 and
+transmitter2).  Run on lumpy.
+- Goal states: 1,351 (find-goal-states :exclude-relations selected, serial, 4 h 51 min,
+  134.3M states).  Leaving out pending selections loses no plan: they change no beam and only
+  use up pairing room, so deleting the select steps that made leftover selections still ends
+  in a goal state.
+- Backward layers (16 threads, all five actions): 1,211 / 1,125 / 61 / 144 new states, then
+  layer 5 saturated.  Closed set: 3,892 states, every one with agent1 at location4, and no
+  walk anywhere among their predecessors.  So no arrangement with agent1 east of the partition,
+  the start included, can reach the goal.
+- Check: find-state-predecessors, actions (move), on a replayed state just after a walk through
+  an open gate1 lists all three walks in (from location1, location2, location3), so walk
+  predecessors are generated.
+- Three enumerator fixes were needed first (src/, 2026-11-07): fps-build-object-sets chooses
+  the holder-held pair's holding fact before the held object's facts, so :requires tests see
+  it; define-base-relation :shares-max-per (shared per-key cap across relations); and
+  fps-action-object-set no longer narrows select-termini (it reaches the held connector through
+  a bound variable, so its predecessors were silently skipped -- symptom "4/5 actions").
+  Regression tests for these changes are still to be run.
+- Saved: corner-topo-advisor-predecessors-1..4.lisp in the project root (git-ignored).
+Why the old 15-step plan worked: it needed connector1 at location2 with four pairings
+(transmitter2, receiver3, receiver1, and connector3's pairing to it).  Before 2026-11-05 the
+limit of 3 applied to the termini chosen in one connect, and pairings made to a connector by
+another connector were unlimited.  The select-termini split only adds steps.
+
+## Unsolvable under the cap -- hand argument (2026-11-06)
 The last walk to location4 needs gate1 open (receiver1 red); after it only location4 can change.
 - End state must have gate1 closed (with receiver1 red, every blue route to receiver3 crosses
   receiver1's feed).  That leaves (A) connector at location2 {transmitter2, receiver3} blue and

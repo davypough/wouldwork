@@ -223,6 +223,8 @@
    :MAX-UNASSIGNED   (:TYPES type... positive-integer)
                      cap how many keys of listed types may take (:UNASSIGNED)
    :MAX-PER          (?arg positive-integer) — subset cardinality cap for arg1
+   :SHARES-MAX-PER   (rel...) — other subset relations whose facts for the same key
+                     count toward this relation's :MAX-PER, and theirs toward it
    :REQUIRES         WouldWork DSL form over relation args for subset partner feasibility
    Note: when *SYMMETRY-PRUNING* is T, interchangeable groups automatically use
    canonical multiset assignments to avoid enumerating symmetric permutations.
@@ -379,7 +381,7 @@ Checks dynamic binding first (for temporary overrides), then declaration order."
   "Canonicalize and normalize KEYS plist for RELATION."
   (enum-check-even-plist keys)
   (let ((allowed-keys '(:pattern :allow-unassigned :early-keys :on-assign
-                        :key-types :max-unassigned :max-per :requires)))
+                        :key-types :max-unassigned :max-per :shares-max-per :requires)))
     (loop for tail on keys by #'cddr
           for k = (first tail) do
       (unless (member k allowed-keys :test #'eq)
@@ -408,6 +410,13 @@ Checks dynamic binding first (for temporary overrides), then declaration order."
                  relation (first relation-vars) (first max-per)))
         (remf plist :max-per)
         (setf (getf plist :max-per-key) (second max-per))))
+    (let ((shares (getf plist :shares-max-per)))
+      (when shares
+        (unless (getf plist :max-per-key)
+          (error "DEFINE-BASE-RELATION ~S: :SHARES-MAX-PER requires :MAX-PER." relation))
+        (unless (and (consp shares) (every #'symbolp shares))
+          (error "DEFINE-BASE-RELATION ~S: :SHARES-MAX-PER must be (rel...); got ~S"
+                 relation shares))))
     (let ((requires (getf plist :requires)))
       (when requires
         (unless (and relation-vars
@@ -529,6 +538,15 @@ Checks dynamic binding first (for temporary overrides), then declaration order."
 (defun enum-max-per-key (rel)
   "Return the :MAX-PER-KEY integer for REL, or NIL."
   (getf (enum-relation-meta rel) :max-per-key))
+
+
+(defun enum-shared-cap-relations (rel)
+  "Return the relations whose facts for a key count toward REL's :MAX-PER: those REL
+   names in :SHARES-MAX-PER, and those naming REL in theirs."
+  (let ((shared (copy-list (getf (enum-relation-meta rel) :shares-max-per))))
+    (dolist (other (get-base-relations) shared)
+      (when (member rel (getf (enum-relation-meta other) :shares-max-per) :test #'eq)
+        (pushnew other shared :test #'eq)))))
 
 
 (defun enum-max-unassigned (rel)
@@ -1278,12 +1296,16 @@ Applies :ALLOW-UNASSIGNED, :MAX-UNASSIGNED, and fixed-map filters."
 (defun enum-subset-degree-ok-p (state rel key chosen-set keys partners max-per-key)
   "True iff adding CHOSEN-SET to KEY does not violate KEY's per-key cap for REL.
    Existing symmetric duplicates are ignored (partner sets are de-duplicated).
+   KEY's facts in the relations sharing REL's cap (:SHARES-MAX-PER) count too, over
+   REL's PARTNERS.
    Note: this intentionally does NOT cap partner objects that appear in REL's
    second argument position."
   (let* ((existing (enum-key-partners state rel key partners))
-         (new (set-difference chosen-set existing :test #'eq)))
+         (new (set-difference chosen-set existing :test #'eq))
+         (shared (loop for other in (enum-shared-cap-relations rel)
+                       sum (length (enum-key-partners state other key partners)))))
     (declare (ignore keys))
-    (<= (+ (length existing) (length new)) max-per-key)))
+    (<= (+ (length existing) (length new) shared) max-per-key)))
 
 
 (defun enum-collect-fluent-relations (relations)

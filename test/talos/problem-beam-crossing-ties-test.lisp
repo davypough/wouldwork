@@ -175,14 +175,18 @@
   (do (assign $reaches nil)
       (assign $src nil)
       (assign $dst nil)
-      (if (beam-live-for-cutting ?from ?to ?lighting)
+      (assign $elevations (beam-live-for-cutting ?from ?to ?lighting))
+      (if $elevations
         (do (assign $src ?from)
             (assign $dst ?to))
-        (if (beam-live-for-cutting ?to ?from ?lighting)
-          (do (assign $src ?to)
-              (assign $dst ?from))))
+        (do (assign $elevations (beam-live-for-cutting ?to ?from ?lighting))
+            (if $elevations
+              (do (assign $src ?to)
+                  (assign $dst ?from)))))
       (if $src
-        (do (assign $blocked nil)
+        (do (assign $blocked
+                    (beam-barrier-before-crossing
+                      $src $dst ?xing (first $elevations) (second $elevations)))
             (assign $reached nil)
             (doall (?gate gate)
               (if (and (bind (beam-crossings-before-gate> $src $before ?gate $dst))

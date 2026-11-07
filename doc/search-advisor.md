@@ -555,6 +555,23 @@ same approaches with their entry points.
    distances upper bounds, so "shortest" holds only for the backward set as built.  Before
    relying on this strategy, confirm that the backward step reproduces a known plan's last
    step.
+   Checks on every layer (corner-topo-advisor, 2026-11-07, which proved the problem
+   unsolvable when the backward set saturated with no walk among its predecessors):
+   (i) the layer header must say `from N/N actions`; a smaller count means an action got no
+   candidates (select-termini was skipped this way because it reaches the held connector
+   only through a variable bound in its precondition; fixed in `fps-action-object-set`).
+   (ii) If a relation never appears in the saved layers although some action's
+   predecessors need it, suspect the generator: a `:requires` test on a held object once
+   ran before the holder's fact was chosen (fixed in `fps-build-object-sets`).
+   (iii) When two subset relations share a per-key limit (pairings and pending selections),
+   declare `:shares-max-per` so over-limit combinations are cut while being built;
+   otherwise they multiply the work and can exhaust the heap.  (iv) Before trusting a
+   saturated set that lacks some action, confirm with `find-state-predecessors` that its
+   predecessors are generated at all from a state where it applies.
+   A goal-only necessity filter (facts every goal state must have, such as a placed
+   connector paired in sight with each goal receiver and source) cut the goal-state run's
+   lighting work about fourfold; it is applied before the lighting step, so it saves that
+   step, not the building of the base facts.
 9. **Action-set reduction.**  Dropping or narrowing an action keeps a shortest-plan or
    no-solution result valid only if every plan using it can be rewritten, at the same length
    or shorter, as one that does not.  Argue it action by action: name the replacement steps,

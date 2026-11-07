@@ -82,6 +82,12 @@ Basis: connector3 at location3 {transmitter1, receiver2, receiver1} red; connect
 Receiver1 via connector3 -> connector2 -> receiver1: connector3 at location3 {transmitter1, receiver2, connector2}, connector2 at location2 {transmitter2, receiver3, receiver1} | D | CONSISTENT for the final state (A's geometry): none of the six segments cross. Lighting is breadth-first (compute-relay-lighting): connector2 fed directly by transmitter2 is blue first, and connector3's later red is ignored, so the end is receiver2 red, receiver3 blue, receiver1 dark. NEEDS for the walk: transmitter2->location2 cut, so connector2 is reached only by connector3's red and lights receiver1. Cutters on that beam, nearest transmitter2 first: transmitter1->location1 (0.48), transmitter1->location4 (1.99), location1->location3 (4.46). Pairing limit 3 per connect, so the connector3-connector2 link is made by whichever is connected second | adopted as end state
 Open gate1 first, place a connector at location4 paired {transmitter1}, then return east and set up | D (A: connector choice) | CONSISTENT; REALIZED and validated (see Result) (A's geometry). Carrying connector1 to location4 with connector2 at location2 {transmitter1, receiver1} as opener is CONTRADICTED: transmitter1->location4 cuts location2->receiver1 at (8.49,4.06) and gate1 closes behind agent1. Adjusted: connector1 at location1 {transmitter1, receiver1} opens gate1 (crosses nothing present); connector2 is carried to location4 {transmitter1}. On return, connector1 moves to location2 {transmitter2, receiver3, receiver1}, and connector3 at location3 gets {transmitter1, receiver2, connector1}. transmitter1->location4 x transmitter2->location2 at (9.75,2.08) lies east of gate1, so it acts even with gate1 closed; it cuts the blue feed and also stops transmitter1->location4 before location2->receiver1. connector1 is lit red via connector3 and receiver1 opens gate1 for the second walk. Picking up connector2 at location4 restores blue (end state row above) | validated; Actions.lisp SG1
 
+## Result under the pairing cap
+UNSOLVABLE with *max-connector-pairings* 3 (pairings on either side counted), proven 2026-11-07
+by backward enumeration: the backward set saturates at 3,892 states, all with agent1 at
+location4 and none reachable by a walk.  Details in Handoff.md.  The result below predates the
+cap.
+
 ## Result
 CLOSED 2026-09-27. Full path of 15 actions, hand-derived and validated from *start-state* against GOAL-FN.
 SUCCESS-P, GOAL-CHECKED-P and GOAL-SATISFIED-P are all T.

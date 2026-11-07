@@ -36,8 +36,12 @@
 ;;;               beam-relay, etc.) independently declare their own transmitter-alias
 ;;;               for their own pre-params; the bare and aliased forms resolve compatibly
 ;;;   relations : crossing-active, beam-crossing>, crossings-along-beam>,
-;;;               beam-crossings-before-gate>, crossings-coincide>, current-beam-crossings
+;;;               beam-crossings-before-gate>, crossings-coincide>, crossing-parameter>,
+;;;               occluder-parameter>,
+;;;               current-beam-crossings
 ;;;   queries   : get-current-beam-crossings, current-crossing-set, beam-reaches-crossing,
+;;;               beam-barrier-before-crossing, uncleared-barrier-between,
+;;;               occupied-location-before,
 ;;;               compute-active-beam-crossings, arbitrate-beam-crossings, crossing-reaches,
 ;;;               crossing-priority, beam-source-distance, same-crossing-set,
 ;;;               beam-cut, beam-cut-in, beam-crossing-endpoints
@@ -68,6 +72,8 @@
   (crossings-along-beam> los-endpoint $list los-endpoint)
   (beam-crossings-before-gate> los-endpoint $list gate los-endpoint)
   (crossings-coincide> crossing crossing)  ;same point on a shared beam, asserted both ways
+  (crossing-parameter> crossing los-endpoint los-endpoint $rational)  ;along the beam, each way
+  (occluder-parameter> location los-endpoint los-endpoint $rational)  ;along the beam, each way
   (current-beam-crossings $list))  ;the crossing pool itself, in crossing1, crossing2, ... order
 
 
@@ -149,18 +155,24 @@
   ;; Resolve the live orientation first.  Fixed direct beams are live only in their
   ;; natural transmitter -> receiver orientation; relay beams are supplied by beam-relay.
   ;; An active crossing earlier on the beam blocks ?xing unless the two coincide: crossings
-  ;; at the same point never block each other.
+  ;; at the same point never block each other.  A closed gate, a wall, edge or boundary
+  ;; segment the beam does not clear, or a body standing in its path blocks every crossing
+  ;; beyond it.
   (do (assign $reaches nil)
       (assign $src nil)
       (assign $dst nil)
-      (if (beam-live-for-cutting ?from ?to ?lighting)
+      (assign $elevations (beam-live-for-cutting ?from ?to ?lighting))
+      (if $elevations
         (do (assign $src ?from)
             (assign $dst ?to))
-        (if (beam-live-for-cutting ?to ?from ?lighting)
-          (do (assign $src ?to)
-              (assign $dst ?from))))
+        (do (assign $elevations (beam-live-for-cutting ?to ?from ?lighting))
+            (if $elevations
+              (do (assign $src ?to)
+                  (assign $dst ?from)))))
       (if $src
-        (do (assign $blocked nil)
+        (do (assign $blocked
+                    (beam-barrier-before-crossing
+                      $src $dst ?xing (first $elevations) (second $elevations)))
             (assign $reached nil)
             (doall (?gate gate)
               (if (and (bind (beam-crossings-before-gate> $src $before ?gate $dst))
@@ -178,6 +190,65 @@
             (if (not $blocked)
               (assign $reaches t))))
       $reaches))
+
+
+(define-query beam-barrier-before-crossing
+    (?src los-endpoint ?dst los-endpoint ?xing crossing ?src-elevation ?dst-elevation)
+  ;; What stops the live beam ?SRC -> ?DST, with the given endpoint elevations, short of
+  ;; ?XING: the barrier record of a wall, edge or boundary segment it does not clear, or
+  ;; (:body <location>) for a body in its path; nil when nothing does.  Gates are judged by
+  ;; BEAM-CROSSINGS-BEFORE-GATE>.  An apparatus sightline stores its barrier records from
+  ;; the location end only, so a beam leaving an apparatus reads them reversed, with both
+  ;; parameters measured from the location.
+  (do (bind (crossing-parameter> ?xing ?src ?dst $xing-parameter))
+      (assign $barrier nil)
+      (if (bind (los-barrier-crossings> ?src $crossings ?dst))
+        (assign $barrier
+                (uncleared-barrier-between
+                  $crossings 0 $xing-parameter ?src-elevation ?dst-elevation))
+        (if (bind (los-barrier-crossings> ?dst $crossings ?src))
+          (assign $barrier
+                  (uncleared-barrier-between
+                    $crossings (- 1 $xing-parameter) 1 ?dst-elevation ?src-elevation))))
+      (if (not $barrier)
+        (assign $barrier
+                (occupied-location-before
+                  ?src ?dst $xing-parameter ?src-elevation ?dst-elevation)))
+      $barrier))
+
+
+(define-query occupied-location-before
+    (?src los-endpoint ?dst los-endpoint ?parameter ?src-elevation ?dst-elevation)
+  ;; (:body <location>) for a location on the beam's sightline, before beam parameter
+  ;; ?PARAMETER, where a beam-blocker spans the beam's elevation; nil otherwise.  The same
+  ;; occlusion test the beam's lighting uses.
+  (do (assign $occupied nil)
+      (if (bind (los-via ?src $occluders ?dst))
+        (ww-loop for $occluder in $occluders
+                 do (if (and (not $occupied)
+                             (bind (occluder-parameter> $occluder ?src ?dst $occluder-parameter))
+                             (< $occluder-parameter ?parameter)
+                             (beam-blocker-occludes-location
+                               $occluder
+                               (beam-elevation-at-location
+                                 $occluder ?src ?src-elevation ?dst ?dst-elevation)))
+                      (assign $occupied (list :body $occluder)))))
+      $occupied))
+
+
+(define-query uncleared-barrier-between
+    (?crossings ?low ?high ?near-elevation ?far-elevation)
+  ;; A non-gate barrier record strictly between beam parameters ?LOW and ?HIGH that the
+  ;; beam does not clear, or nil.
+  (do (assign $barrier nil)
+      (ww-loop for $crossing in ?crossings
+               do (if (and (not $barrier)
+                           (not (eql (first $crossing) :gate))
+                           (< ?low (third $crossing) ?high)
+                           (not (barrier-crossing-clear-for-object
+                                  nil $crossing ?near-elevation ?far-elevation)))
+                    (assign $barrier $crossing)))
+      $barrier))
 
 
 (define-query compute-active-beam-crossings (?active)

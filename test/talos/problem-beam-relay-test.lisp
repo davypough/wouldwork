@@ -204,7 +204,7 @@
            (connector-location-clash ?l)))
 
     ;; Structural pairing eligibility versus live beam visibility, plus negative branches.
-    (potentially-visible origin decoy-source)
+    (potentially-visible origin 1 decoy-source 1)
     (not (visible origin decoy-source))
     (not (open closed-gate))
     ;; NEW-SOURCE and NEW-RECEIVER are already linked here, so they are not offered again.
@@ -225,7 +225,7 @@
     (not (holding drop-agent drop-connector))
     (has-location drop-connector floor)
     (paired drop-connector ledge-source)
-    (not (potentially-visible floor ledge-source))
+    (not (potentially-visible floor 1 ledge-source 1))
     (not (exists (?h hue)
            (color drop-connector ?h)))
     (not (exists (?t terminus)

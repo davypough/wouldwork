@@ -75,9 +75,11 @@
     (on height-jammer height-box)
     (jamming height-jammer height-gun)
 
-    ;; Coordinate derivation retains the wall crossing for pairing but ordinary sight
-    ;; remains opaque regardless of endpoint height.
-    (potentially-visible height-site height-gun)
+    ;; Coordinate derivation retains the wall crossing; ordinary sight remains opaque
+    ;; regardless of endpoint height, while structural sight clears the wall only by height
+    ;; and ignores the closed gate.
+    (not (potentially-visible height-site 1 height-gun 1))
+    (potentially-visible height-site 5 height-gun 5)
     (not (visible height-site height-gun))
     (bind (los-barrier-crossings>
             height-site $crossings height-gun))

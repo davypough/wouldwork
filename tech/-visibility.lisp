@@ -74,8 +74,10 @@
 
 (define-query potentially-visible
     (?location location
-     ?object (either gate transmitter receiver floor-repeater wall-repeater gun location))
-  (do ?location ?object nil))
+     ?near-elevation
+     ?object (either gate transmitter receiver floor-repeater wall-repeater gun location)
+     ?far-elevation)
+  (do ?location ?near-elevation ?object ?far-elevation nil))
 
 
 (define-query beam-visible

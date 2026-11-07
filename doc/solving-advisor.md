@@ -687,7 +687,7 @@ Their contracts are in `doc/constraint-led-solving/Extractor-Specifications.md`.
   evaluates one settled state, such as a replayed prefix's
   `(action-sequence-validation-final-state (validate-action-sequence *start-state* <actions>))`,
   with the engine's queries: gates read, active crossings, and each live beam's crossings labelled ACTIVE,
-  REACHED/INACTIVE, BEYOND CUT or BEYOND CLOSED (specification 8.10). An unsettled or
+  REACHED/INACTIVE, BEYOND CUT, BEYOND CLOSED, BEYOND WALL or BEYOND BODY (specification 8.10). An unsettled or
   incomplete input is UNRESOLVED. It proves no reachability or composition.
 - **Supplied relay lighting:** `(report-relay-lighting-scenario (list :state <state> :provenance "<text>"))`,
   optionally `:view :recording` (open cycle only) and `:chains <chains> :phase <phase>` for T33's
@@ -732,7 +732,8 @@ Their contracts are in `doc/constraint-led-solving/Extractor-Specifications.md`.
 
 A grounded agent cannot place onto a held tray (top 3/2, placement reach 1);
 use a raised location. SELECT-TERMINI chooses termini while the connector is held,
-by structural sightlines from the agent's current location; a selection survives later
+by structural sight from the agent's current location (gates and bodies ignored, walls
+block); selections accumulate across viewpoints, and a selection survives later
 moves, including one-way drops. PUT-CONNECTOR sets the connector down and pairs every
 selection; without selections it pairs nothing. Generated termini are reversed
 (e.g. repeater then receiver): hand-written termini must follow reverse declaration
@@ -744,7 +745,9 @@ PICKUP-CONNECTOR clears that connector's pairings, beams and
 any selection naming it: the only undo at the agent's own location.
 Beam crossings: two live beams that cross cut each other; a beam cut nearer its
 source never reaches later crossings, so an earlier sacrificial crossing shields
-them. A crossing on the source side of a closed gate still acts. A transmitter
+them. A crossing on the source side of a closed gate still acts; a beam stops at a
+wall (edge, boundary) it cannot clear, or at an agent or connector standing in its
+path, and cuts nothing beyond it. A transmitter
 pairing is live for cutting even while its connector is unlit. Relay lighting
 is breadth-first: a relay keeps the hue that reaches it first and ignores later
 ones (two hues in the same step leave it unlit), so one relay can pass a relayed

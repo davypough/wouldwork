@@ -18,6 +18,10 @@
 ;;;     are, what is held, which connectors are paired).  The goal states can then be
 ;;;     generated directly and worked backward from, so the search from the start only has
 ;;;     to reach one of them.  The rules and the goal are unchanged.
+;;;   - The declared facts include a held connector's pending selections, and states that
+;;;     break the rules on those facts (link limit, held-or-placed) are screened out before
+;;;     they are worked backward from.  The screen enforces rules only; it guesses nothing
+;;;     about the answer.
 
 
 (in-package :ww)
@@ -117,11 +121,56 @@
   :max-per (?connector 3))
 
 
-;; Consistency only, not a guess at the answer: every connector is either at a location or
-;; held, never both.
-(define-goal-filter consistent-holding
+;; Termini selected for the held connector, not yet paired (they pair at put-down).
+;; Only the held connector can have selections, so other connectors get none.  Kept
+;; links and selections share the connector's limit of 3.
+(define-base-relation (selected ?connector ?terminus)
+  :max-per (?connector 3)
+  :shares-max-per (paired)
+  :requires (holding agent1 ?connector))
+
+
+;; Consistency only, not a guess at the answer.  Applied to goal states and to every
+;; predecessor.  Each connector is either at a location or held, never both; it has at
+;; most *max-connector-pairings* links and selections, counted on either side; only the
+;; held connector has selections; a terminus is not both paired and selected; and no
+;; connector links to itself or is linked in both directions.
+(define-query state-feasible? ()
   (forall (?c connector)
-    (or (and (bind (has-location ?c $loc))
-             (not (holding agent1 ?c)))
-        (and (not (bind (has-location ?c $loc)))
-             (holding agent1 ?c)))))
+    (and (or (and (bind (has-location ?c $loc))
+                  (not (holding agent1 ?c)))
+             (and (not (bind (has-location ?c $loc)))
+                  (holding agent1 ?c)))
+         (<= (connector-link-count ?c) *max-connector-pairings*)
+         (forall (?t terminus)
+           (and (not (and (paired ?c ?t) (selected ?c ?t)))
+                (or (not (selected ?c ?t))
+                    (holding agent1 ?c))
+                (or (not (connector ?t))
+                    (and (or (different ?c ?t)
+                             (not (or (paired ?c ?t) (selected ?c ?t))))
+                         (not (and (paired ?c ?t) (paired ?t ?c)))
+                         (not (and (selected ?c ?t) (paired ?t ?c))))))))))
+
+
+;; Goal states only, and necessary rather than a guess: receiver2 (red) and receiver3
+;; (blue) light only from a placed connector paired with them in structural sight, and red
+;; and blue enter the connectors only from transmitter1 and transmitter2 the same way.
+;; Screens base states before the costly lighting step.
+(define-goal-filter goal-needs-sighted-links
+  (and (exists (?c connector)
+         (and (paired ?c receiver2)
+              (bind (has-location ?c $loc))
+              (potentially-visible $loc (top ?c) receiver2 (top receiver2))))
+       (exists (?c connector)
+         (and (paired ?c receiver3)
+              (bind (has-location ?c $loc))
+              (potentially-visible $loc (top ?c) receiver3 (top receiver3))))
+       (exists (?c connector)
+         (and (paired ?c transmitter1)
+              (bind (has-location ?c $loc))
+              (potentially-visible $loc (top ?c) transmitter1 (top transmitter1))))
+       (exists (?c connector)
+         (and (paired ?c transmitter2)
+              (bind (has-location ?c $loc))
+              (potentially-visible $loc (top ?c) transmitter2 (top transmitter2))))))

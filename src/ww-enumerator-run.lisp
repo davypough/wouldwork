@@ -623,10 +623,18 @@ worker must print exactly as the caller does for its keys to match the reachable
 (defun fps-action-object-set (action)
   "Return a flat list of all object instances from ACTION's precondition-type-inst.
    Used to filter key-objects to only those the action can operate on.
-   Returns NIL for dynamic actions (query-based types), meaning no filtering."
+   Returns NIL, meaning no filtering, for dynamic actions (query-based types), and
+   for an action that modifies a base relation none of whose keys are among those
+   instances: it reaches its keys through variables bound in its precondition (eg
+   SELECT-TERMINI, which selects for the held connector but takes only the agent)."
   (when (action.dynamic action)
     (return-from fps-action-object-set nil))
-  (fps-flatten-type-inst (action.precondition-type-inst action)))
+  (let ((objects (fps-flatten-type-inst (action.precondition-type-inst action))))
+    (dolist (rel (intersection (action.effect-adds action) (get-base-relations) :test #'eq)
+                 objects)
+      (unless (some (lambda (key) (member key objects :test #'eq))
+                    (expand-type-spec-instances* (first (relation-signature rel))))
+        (return nil)))))
 
 
 (defun fps-build-predecessor-enum-actions (action base-relations)
@@ -716,7 +724,8 @@ worker must print exactly as the caller does for its keys to match the reachable
    Every key object in KEY-GROUPS forms a single set over the keyed relations.
    Every value (HOLDER HELD) of an UNKEYED relation (eg bijective HOLDING) forms a
    pair set: HELD is re-enumerated in all MODIFIED-RELS, HOLDER only in that
-   relation, whose enumeration is restricted to the pair's own link or none."
+   relation, whose enumeration is restricted to the pair's own link or none.
+   The pair's link is enumerated first, so :REQUIRES tests on HELD's relations see it."
   (let ((keyed-rels (set-difference modified-rels (mapcar #'car unkeyed) :test #'eq))
         (sets nil))
     (dolist (group key-groups)
@@ -733,8 +742,8 @@ worker must print exactly as the caller does for its keys to match the reachable
             (setf (action.precondition-args restricted) (list tuple '(:unassigned)))
             (push (list (list holder held)
                         (list (list holder (car entry)) (cons held modified-rels))
-                        (append (cdr (assoc held key-groups :test #'eq))
-                                (list restricted)))
+                        (cons restricted
+                              (cdr (assoc held key-groups :test #'eq))))
                   sets)))))
     (nreverse sets)))
 

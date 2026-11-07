@@ -1,6 +1,7 @@
 PROBLEM / REVISION / AUTHORIZED SCOPE
   Active record: doc/problems/intersect/spec-analysis.txt.
-  Specification: probs/problem-intersect.lisp (new), revision 1, complete 2026-11-05.
+  Specification: probs/problem-intersect.lisp, revision 2 (2026-11-07: location8 added);
+  revision 1 complete 2026-11-05.
   Scope approved by user 2026-11-05: draft the spec section by section; read tech sources
   (gate, plate, beam-relay, beam-crossing, walkability, visibility, reachability, ladder,
   elevation if needed) and probs/problem-rumin-topo.lisp as a coordinate-geometry pattern;
@@ -9,7 +10,7 @@ PROBLEM / REVISION / AUTHORIZED SCOPE
   Windows-only confirmations handed to the user as REPL sequences.
 
 INPUT ANALYSIS AND OBJECTIVE
-  doc/problems/intersect/problem-analysis.txt, revision 3 (2026-11-05).
+  doc/problems/intersect/problem-analysis.txt, revision 4 (2026-11-07; L8 added).
   Preserved snapshot: problem-analysis-2026-11-04-before-spec.txt (rev 2; until wrap-up).
   Rev 3 corrections (user): L2 -> (21,6); L8 removed; LD1 climbs L3 -> L2.  Agreed.
 
@@ -207,3 +208,12 @@ HANDOFF AND NEXT STEP
 
 CORRECTIONS AND HISTORY
   None.
+
+  14. Revision 2: location8 (L8) at (15,8) added (user, 2026-11-07, diagram updated), cloud
+     SBCL 2.2.9, assistant-run.  Edit: location8 in the location type; (location-coords>
+     location8 15 8).  Stages without errors (L8 lies on the y=8 and x=15 lines; coincident
+     crossings handled by the tie fix of check 1).  Walking: L8 <-> L2 free; L8 <-> L1 via
+     gate1; L8 <-> L3 via gate2; L4/L5/L6 via gate2+gate3; L7 via gate2+gate3+gate4 --
+     matches the central-room placement.  No REACH-VIA facts (nearest location, L1, is 3
+     away, beyond the 5/2 reach limit).  Depth 7, *threads* 16: 5,705 states, 3,509 repeats,
+     10 inconsistent abandoned, no solution, 0.7 s.  Windows staging not yet confirmed.

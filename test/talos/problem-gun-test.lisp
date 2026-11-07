@@ -154,7 +154,7 @@
     (visible disallowed-site gun2)
     (jam-disallowed> goal disallowed-site gun2)
     (not (jam-target-applicable-p state 'agent1 'gun2 'disallowed-site))
-    (potentially-visible blocked-site gun3)
+    (potentially-visible blocked-site 1 gun3 1)
     (not (visible blocked-site gun3))
     (not (jam-target-applicable-p state 'agent1 'gun3 'blocked-site))
 

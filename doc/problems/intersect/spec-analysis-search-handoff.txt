@@ -1,11 +1,11 @@
 INTERSECT -- OPTIONAL SEARCH-ADVISOR HANDOFF
-Revision: 2026-11-05 (revision 1)
+Revision: 2026-11-07 (revision 2: location8 added; revision 1 2026-11-05)
 Status: Specification complete for the agreed scope; ready for optional search-advisor work.
 Preparing this handoff does not invoke the search advisor or authorize experiments.
 
 RECORDS
-Requirements: problem-analysis.txt (rev 3 with addenda)
-Current implementation and evidence: spec-analysis.txt (checks 1-13)
+Requirements: problem-analysis.txt (rev 4)
+Current implementation and evidence: spec-analysis.txt (checks 1-14)
 Specification: ../../../probs/problem-intersect.lisp
 Diagram: intersect-diagram.png
 

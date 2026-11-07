@@ -4191,6 +4191,20 @@ counted as layer-blind roots."
                     collect (format nil "BEYOND CLOSED ~(~A~)" gate)))))
 
 
+(defun crossing-barrier-reasons (state crossing from to lighting)
+  "BEYOND <kind> <barrier> when a wall, edge or boundary segment the live beam FROM-TO does
+   not clear stops it short of CROSSING, or BEYOND BODY at <location> when a body in its
+   path does, by the engine's own barrier query."
+  (let* ((elevations (relay-view-call 'beam-live-for-cutting state from to lighting))
+         (barrier (and elevations
+                       (relay-view-call 'beam-barrier-before-crossing state from to crossing
+                                        (first elevations) (second elevations)))))
+    (when barrier
+      (list (if (eq (first barrier) :body)
+              (format nil "BEYOND BODY at ~(~A~)" (second barrier))
+              (format nil "BEYOND ~A ~(~A~)" (symbol-name (first barrier)) (second barrier)))))))
+
+
 (defun crossing-other-status (state crossing from to active lighting rows open-gates)
   "Why the other beam through CROSSING does not make it active: NOT LIVE, or NOT REACHING
    with its reasons."
@@ -4207,10 +4221,12 @@ counted as layer-blind roots."
                                                         (eq (third row) (second direction))))
                                      rows)))
                    (format nil "other beam ~A NOT REACHING (~{~A~^; ~})" text
-                           (or (and row (crossing-unreached-reasons
-                                          crossing (second row)
-                                          (crossing-gate-splits (first direction) (second direction))
-                                          active open-gates))
+                           (or (append (crossing-barrier-reasons
+                                         state crossing (first direction) (second direction) lighting)
+                                       (and row (crossing-unreached-reasons
+                                                  crossing (second row)
+                                                  (crossing-gate-splits (first direction) (second direction))
+                                                  active open-gates)))
                                (list "UNEXPLAINED"))))))))))
 
 
@@ -4218,8 +4234,9 @@ counted as layer-blind roots."
   "One crossing's label on the live beam FROM-TO, decided by the engine's reaching query."
   (cond ((not (relay-view-call 'beam-reaches-crossing state from to crossing active lighting))
          (format nil "~{~A~^; ~}"
-                 (or (crossing-unreached-reasons crossing ids (crossing-gate-splits from to)
-                                                 active open-gates)
+                 (or (append (crossing-barrier-reasons state crossing from to lighting)
+                             (crossing-unreached-reasons crossing ids (crossing-gate-splits from to)
+                                                         active open-gates))
                      (list "NOT REACHED: UNEXPLAINED"))))
         ((member crossing active) "ACTIVE")
         (t (format nil "REACHED, INACTIVE: ~A"

@@ -1,9 +1,10 @@
 PROBLEM / REVISION / SOURCES / AUTHORIZED SCOPE
-  Problem: intersect (diagram title INTERSECTIONS).  Revision 3, 2026-11-05 (rev 2 consolidated 2026-11-04).
+  Problem: intersect (diagram title INTERSECTIONS).  Revision 4, 2026-11-07 (rev 3 2026-11-05; rev 2 consolidated 2026-11-04).
   Sources: doc/problems/intersect/intersect-diagram.png; symbol key from
   doc/problems/rumin-topo/diagram.png; user clarifications in dialogue 2026-11-04
   (apparatus offsets, starts, controls, goal, ladder LD1 added in dialogue);
-  user corrections 2026-11-05 (L2 relocated, L8 removed, LD1 retargeted to L2).
+  user corrections 2026-11-05 (L2 relocated, L8 removed, LD1 retargeted to L2);
+  user addition 2026-11-07 (new L8 at (15,8), diagram updated).
   Record: doc/problems/intersect/problem-analysis.txt.
   Scope: problem-advisor analysis only.  No spec, measurement, or search authorized.
 
@@ -13,12 +14,12 @@ AGREED PROBLEM DESCRIPTION  (agreed by user 2026-11-04)
     x=5:  w1 y0-6, WIN4 y6-10, w9 y10-15.   x=8: w2 y3-6, WIN3 y6-10.
     w10 y=10 x5-8.   y=15: w8 x5-13, WIN2 x13-17, w7 x17-23.
     x=23: w6 y10-15, WIN1 y6-10, w5 y4-6.   w3 y=6 x8-14.   w4 x=17 y0-6.
-    No wall along y=6 x5-8.  Faint erased circles near (6,5) and (15,8) are not locations.
+    No wall along y=6 x5-8.  Faint erased circles (e.g. near (6,5)) are not locations.
   Gates: G1 y=6 x14-17; G2 x=23 y0-4; G3 x=18 y15-20; G4 y=6 x0-5.
   Ladder: LD1 positioned at L3; one-way climb L3 -> L2; empty-handed only.
   Areas (joined only by gates and LD1):
     lower room    x5-17 y0-6 plus cell x5-8 y6-10:          L1(15,5), T1b, R1b
-    central room  x8-23 y6-10, x5-23 y10-15, x17-23 y0-6:    L2(21,6), T2r, R2r
+    central room  x8-23 y6-10, x5-23 y10-15, x17-23 y0-6:    L2(21,6), L8(15,8), T2r, R2r
     east corridor x23-29 y0-20 and y15-20 x18-23:            L3(24,8), LD1
     west/north corridor x0-5 y6-20 and y15-20 x0-18:         L4(15,16), L5(4,8), L6(1,7)+P1,
                                                              R3b, R4r
@@ -67,7 +68,7 @@ STRUCTURE AND GROWTH
   from east to central.  Every plan therefore passes G1, G2, G3, G4 in that order, each
   open at its time of passage.  C2 (at L2) is unreachable before G1 is first opened; C3 (at L3)
   before G2 is first opened.
-  Size: 1 agent, 3 connectors, 7 locations, 6 apparatus, 4 gates, 1 plate, 1 ladder.
+  Size: 1 agent, 3 connectors, 8 locations, 6 apparatus, 4 gates, 1 plate, 1 ladder.
   History irrelevant to future legality: state fully determines continuations.
   Growth: connect branching = reachable locations x link subsets (92 for 8 termini, cap 3);
   subsets grow ~cubically in termini; locations, gates grow linearly.
@@ -84,8 +85,8 @@ JUSTIFIED DESIGN  (all agreed by user 2026-11-04)
      would require solving.  Reconsider: search advisor may test omission as a speed-up.
      put-connector needed (cheapest way to hold P1 with an unlinked connector).
   D4 *max-connector-pairings* 3 (user: probably needed; one input + two outputs).
-  D5 Locations L1-L7 as given; no added standing locations.  Reconsider if a needed beam
-     line has no location.
+  D5 Locations L1-L8 as given (L8 added by user 2026-11-07 for the third subgoal leg).
+     Reconsider if a needed beam line has no location.
   D6 Coordinate-derived geometry (walls, windows, gates, fixtures, locations), as in
      rumin-topo; required for exact crossings.
   D7 No pruning of hue-mismatched links: a non-activating link beam can still cut other
@@ -155,3 +156,6 @@ CORRECTIONS
   - Rev 3 addendum (user, 2026-11-05): C2 starts at L2, not L3.
   - Rev 3 addendum (user, 2026-11-05): C3 starts at L3, not L5.
   - Rev 3 addendum (user, 2026-11-05): link cap of 3 is per connector, total, at any time.
+  - Rev 4 (user, 2026-11-07): new location L8 at (15,8) in the central room, added to the
+    diagram; the user needs it for the third leg of subgoaling (L3 -> L5).  Area membership
+    and the forced gate order are unchanged.  Locations now L1-L8.

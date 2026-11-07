@@ -46,7 +46,9 @@
 ;;;                relay-anchor, relay-linked,
 ;;;                relay-link-clear, relay-link-clear-for-object,
 ;;;                paired-relay-visible, paired-relay-visible-for-object,
-;;;                relay-beam-live-for-cutting, beam-relay-source-distance,
+;;;                relay-beam-live-for-cutting (returning endpoint elevations),
+;;;                relay-connector-beam-elevations, paired-connector-top-at,
+;;;                linked-connector-top-at, beam-relay-source-distance,
 ;;;                compute-relay-lighting-and-clashes, lit-connector-clash,
 ;;;                connectable-terminus, connector-link-count;
 ;;;                overrides propagation-invariant-violated (-propagation)
@@ -482,34 +484,63 @@
     (?from beam-node ?to beam-node ?lighting)
   ;; Arrival/visibility gates whether a relay becomes lit.  Once lit, its outbound segment
   ;; is live for crossing analysis; fixed coupled segments additionally require their
-  ;; authored corridor to be clear.
-  (or (and (transmitter ?from)
-           (location ?to)
-           (exists (?connector connector)
-             (and (has-location ?connector ?to)
-                  (paired ?connector ?from))))
-      (and (repeater ?from)
-           (assoc ?from ?lighting)
-           (or (and (or (repeater ?to) (receiver ?to))
-                    (fixed-beam-corridor-clear ?from ?to))
-               (and (location ?to)
-                    (exists (?connector connector)
-                      (and (has-location ?connector ?to)
-                           (paired ?connector ?from))))))
-      (and (location ?from)
-           (exists (?connector connector)
-             (and (has-location ?connector ?from)
-                  (assoc ?connector ?lighting)
-                  (or (and (receiver ?to)
-                           (paired ?connector ?to))
-                      (and (repeater ?to)
-                           (paired ?connector ?to))
-                      (and (location ?to)
-                           (exists (?other connector)
-                             (and (different ?other ?connector)
-                                  (has-location ?other ?to)
-                                  (or (paired ?other ?connector)
-                                      (paired ?connector ?other)))))))))))
+  ;; authored corridor to be clear.  A live segment returns its (near far) endpoint
+  ;; elevations, which BEAM-REACHES-CROSSING needs to judge finite barriers; nil otherwise.
+  (do (assign $elevations nil)
+      (if (location ?from)
+        (assign $elevations (relay-connector-beam-elevations ?from ?to ?lighting))
+        (if (or (transmitter ?from)
+                (and (repeater ?from)
+                     (assoc ?from ?lighting)))
+          (if (location ?to)
+            (do (assign $far (paired-connector-top-at ?to ?from))
+                (if $far
+                  (assign $elevations (list (top ?from) $far))))
+            (if (and (repeater ?from)
+                     (or (repeater ?to) (receiver ?to))
+                     (fixed-beam-corridor-clear ?from ?to))
+              (assign $elevations (list (top ?from) (top ?to)))))))
+      $elevations))
+
+
+(define-query relay-connector-beam-elevations (?from location ?to beam-node ?lighting)
+  ;; A lit connector at ?FROM beams to a receiver or repeater it is paired with, or to a
+  ;; connector at location ?TO linked with it either way.
+  (do (assign $elevations nil)
+      (doall (?connector connector)
+        (if (and (has-location ?connector ?from)
+                 (assoc ?connector ?lighting))
+          (do (assign $far nil)
+              (if (location ?to)
+                (assign $far (linked-connector-top-at ?to ?connector))
+                (if (and (or (receiver ?to) (repeater ?to))
+                         (paired ?connector ?to))
+                  (assign $far (top ?to))))
+              (if $far
+                (assign $elevations (list (top ?connector) $far))))))
+      $elevations))
+
+
+(define-query paired-connector-top-at (?location location ?source beam-node)
+  ;; The top of a connector at ?LOCATION paired with ?SOURCE, or nil.
+  (do (assign $top nil)
+      (doall (?connector connector)
+        (if (and (has-location ?connector ?location)
+                 (paired ?connector ?source))
+          (assign $top (top ?connector))))
+      $top))
+
+
+(define-query linked-connector-top-at (?location location ?connector connector)
+  ;; The top of another connector at ?LOCATION linked with ?CONNECTOR either way, or nil.
+  (do (assign $top nil)
+      (doall (?other connector)
+        (if (and (different ?other ?connector)
+                 (has-location ?other ?location)
+                 (or (paired ?other ?connector)
+                     (paired ?connector ?other)))
+          (assign $top (top ?other))))
+      $top))
 
 
 (define-query beam-relay-source-distance (?from beam-node ?lighting)
@@ -532,8 +563,10 @@
      ?vantage location
      ?connector connector
      ?terminus terminus)
-  ;; Selection uses structural LOS (gates ignored) from the agent's current location.
-  ;; Exact placement and live visibility later decide whether the beam carries color.
+  ;; Selection uses structural sight (gates ignored, walls blocking) from the agent's
+  ;; current location, at the height the connector would have set down on the ground there.
+  ;; Selections accumulate across viewpoints.  Exact placement and live visibility later
+  ;; decide whether the beam carries color.
   ;; A terminus already linked to or selected by the connector is not offered again.
   ;; A connector terminus must stand somewhere (not held) and have room under
   ;; *max-connector-pairings*.  A same-location connector pair can carry a beam only
@@ -544,13 +577,17 @@
        (or (and (or (transmitter ?terminus)
                     (receiver ?terminus)
                     (repeater ?terminus))
-                (potentially-visible ?vantage ?terminus))
+                (potentially-visible
+                  ?vantage (+ (location-elevation ?vantage) (object-height ?connector))
+                  ?terminus (top ?terminus)))
            (and (connector ?terminus)
                 (different ?terminus ?connector)
                 (not (paired ?terminus ?connector))
                 (< (connector-link-count ?terminus) *max-connector-pairings*)
                 (bind (has-location ?terminus $terminus-location))
-                (potentially-visible ?vantage $terminus-location)))))
+                (potentially-visible
+                  ?vantage (+ (location-elevation ?vantage) (object-height ?connector))
+                  $terminus-location (top ?terminus))))))
 
 
 (define-query connector-link-count (?connector connector)

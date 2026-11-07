@@ -88,6 +88,8 @@
     (?from beam-node
      ?to beam-node
      ?lighting)
+  ;; A live beam returns its (near far) endpoint elevations, which beam-crossing uses to
+  ;; judge finite barriers; nil otherwise.
   (or (direct-beam-live-for-cutting ?from ?to)
       (relay-beam-live-for-cutting ?from ?to ?lighting)))
 

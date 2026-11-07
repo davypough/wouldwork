@@ -171,5 +171,9 @@
 (define-query direct-beam-live-for-cutting (?from beam-node ?to beam-node)
   ;; A transmitter emits every coupled fixed beam whose authored corridor is clear.
   ;; Repeater-origin beams are gated by relay lighting in beam-relay's liveness hook.
-  (and (transmitter ?from)
-       (fixed-beam-corridor-clear ?from ?to)))
+  ;; A live beam returns its (near far) endpoint elevations; nil otherwise.
+  (do (assign $elevations nil)
+      (if (and (transmitter ?from)
+               (fixed-beam-corridor-clear ?from ?to))
+        (assign $elevations (list (top ?from) (top ?to))))
+      $elevations))

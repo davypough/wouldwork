@@ -1,0 +1,82 @@
+INTERSECT -- SEARCH ANALYSIS
+Record: doc/problems/intersect/search-analysis.txt
+Entry: specification handoff spec-analysis-search-handoff.txt (revision 1, 2026-11-05).
+Upstream: problem-analysis.txt (rev 3), spec-analysis.txt (checks 1-13).
+Model revision: probs/problem-intersect.lisp as of 2026-11-05 (final spec revision, check 10).
+
+PHASE 0: PROFILE  (2026-11-07; read only, nothing run)
+  Summary: one agent must reach L7 through four gates in the forced order G1, G2, G3, G4,
+    opening each by relaying beams with three identical connectors (each linking to at most
+    3 termini).  1 agent, 3 connectors, 7 locations, 6 beam fixtures, 1 plate, 1 ladder.
+    Plan length not fixed by the rules.
+  Profile:
+  - Answer: a sequence of moves; shortest preferred, unit cost (handoff / user).
+  - Happenings or patrollers: none (spec).
+  - Repeated states: yes; pickups and puts undo each other, walks reverse (spec); 62% repeats
+    at depth 7 (spec-analysis check 10).
+  - Interchangeable objects: the three connectors (spec); symmetry check passes, benefit
+    unmeasured (0 duplicates within depth 7).
+  - Space and work: depth 7 = 5,721 states, branching 4.3, 0.5 s on Windows (check 13).
+    Growth beyond 7 unknown.
+  - Lower bound: placeholder only (0 at L7, else 1) (spec).  A forced-route bound
+    (gates still to pass, plus the actions each still needs) is a candidate.
+  - Dead states: none proved yet.
+  - Backward search: not suitable; the goal fixes only the agent, the rest is derived
+    beam/gate state (spec).
+  - Talos with connectors: yes; link cap 3 per connector (spec).
+  - Suspected minimum length: each of the four gate passages is a walk, and each gate
+    condition seems to need a fresh pickup and placement (C1 must stay at L1 for G1, so the
+    agent reaches L2 empty-handed); rough count at least about 12 steps.  Hand count,
+    not proved.
+  Questions for the user: maximum search depth; time available per search.
+  User (2026-11-07): by hand, L1 -> L2 in about 5 steps, L3 by 9, L5 by 23; expects a
+    full plan near 35 steps.  Supersedes the rough 12-step count above.
+
+PHASE 1: GROWTH LADDER  (2026-11-07, assistant-run, cloud container, 2 cores, SBCL 2.2.9)
+  Model: probs/problem-intersect.lisp snapshot of 2026-11-07 (unchanged since check 10).
+  Settings: as in spec (graph, min-length, symmetry on, placeholder bound) + *threads* 16;
+  only *depth-cutoff* varied.  Start: real start.  Each run exhausted; no solution at any depth.
+    depth  distinct(closed)  ratio  processed   time(s)
+      8         2,740          -        7,965     0.7
+      9         5,419        1.98      12,284     1.4
+     10        15,267        2.82      27,547     2.5
+     11        24,028        1.57      76,013     6.9
+     12        36,837        1.53     115,355    12.2
+     13        80,073        2.17     207,135    21.2
+     14       132,213        1.65     381,740    42.5
+     15       199,875        1.51     751,341    83.6
+     16       288,977        1.45   1,225,365   141.3
+  Reading: distinct-state growth per level is falling (2.2 -> 1.45 over depths 13-16), a
+  sign the reachable space may saturate; time per level still about x1.7-2.0.
+  Processed/distinct about 4: states re-expanded when reached by shorter routes (no
+  breadth-first driver in Wouldwork).  Symmetry: 0 duplicates pruned at every depth.
+  Consistent with the user's hand count (no route to L7 within 16).
+  Ladder continued (2026-11-07, same settings, one SBCL process per depth):
+    depth  distinct(closed)  ratio  processed   time(s)
+     17       535,558        1.85   2,000,856   236.8
+     18       974,033        1.82   3,544,509   422.4
+     19     1,280,058        1.31   6,404,002   713.7
+  Reading: the slowdown at 13-16 did not continue; distinct growth swings 1.3-1.85 per
+  level, time steadily x1.7-1.8 per level.  No solution within 19.
+  Projection to depth ~35 (user's expected length): time x1.7 per level gives ~3.5 million s
+  on 2 cores (weeks; several days even if the user's 32-thread machine is 5-10x faster);
+  distinct states at an average x1.3-1.5 give roughly 10^9 or more, beyond 25 GB memory.
+  One search from the start is not practical unless the space suddenly saturates, for which
+  there is no sign.  Strategies here (stronger lower bound, omitting retaining pickup)
+  would cut a constant factor, not the needed 10^3-10^4.
+
+HAND-OFF TO THE SOLVING ADVISOR  (proposed to the user 2026-11-07)
+  SPEC:        probs/problem-intersect.lisp; the ladder ran on revision 1 (L1-L7).  Revision 2
+               (2026-11-07) adds L8 at (15,8), which the user needs for the L3 -> L5 leg.
+               Maximum depth: user's estimate ~35.
+  RUNS:        growth ladder above, real start, depths 8-19, each exhausted, no solution;
+               time x1.7-1.8 per level; 1.28 million distinct states at depth 19 (714 s, 2 cores).
+  STRATEGIES:  forward search with graph merging and connector symmetry: symmetry pruned 0
+               states at every depth.  No breadth-first driver (states re-expanded ~5x).
+               Backward search unsuitable (goal fixes only the agent's location).
+               Stronger bound / dropping retaining pickup: constant-factor gains only (not run).
+  DEAD STATES: none proved.
+  NECESSARY:   gates passed in order G1, G2, G3, G4 (proved, problem analysis); C2 reachable
+               only after G1, C3 only after G2 (proved); no plan within 19 steps (measured).
+               User hand milestones: agent at L2 by about step 5, L3 by 9, L5 by 23 (user).
+  ESTIMATE:    one search to ~35: weeks of time and ~10^9 states (range above).

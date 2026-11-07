@@ -4,8 +4,9 @@
 ;;; -beam-los-coordinates role.  Independent horizontal bands characterize:
 ;;;
 ;;;   1. Empty-corridor LOS to a transmitter, receiver, and fixed repeater.
-;;;   2. Structural LOS retained across finite walls, with ordinary sight opaque and beam
-;;;      clearance decided from crossing height (including exact-top blocking).
+;;;   2. Structural LOS retained across finite walls, with ordinary sight opaque and both
+;;;      beam clearance and relay-selection sight decided from crossing height (including
+;;;      exact-top blocking).
 ;;;   3. Exact gate occluder lists for open and closed gates, plus the strict
 ;;;      gate-endpoint case that must not add an occluder.
 ;;;   4. Location occlusion exactly at an overridden inclusive 2/5-unit tolerance, while
@@ -215,9 +216,11 @@
     (visible clear-site clear-receiver)
     (visible clear-site clear-repeater)
 
-    ;; Walls retain structural pairing but remain opaque to ordinary sight.  INTERIOR-WALL
-    ;; explicitly overrides the default with height 2; equality blocks and 3 clears.
-    (potentially-visible wall-interior-site wall-interior-receiver)
+    ;; Walls retain the structural sightline but remain opaque to ordinary sight; selection
+    ;; sight clears a wall only by height.  INTERIOR-WALL explicitly overrides the default
+    ;; with height 2; equality blocks and 3 clears.
+    (not (potentially-visible wall-interior-site 2 wall-interior-receiver 2))
+    (potentially-visible wall-interior-site 3 wall-interior-receiver 3)
     (not (visible wall-interior-site wall-interior-receiver))
     (bind (los-barrier-crossings>
             wall-interior-site $wall-crossings wall-interior-receiver))
@@ -228,24 +231,27 @@
 
     ;; CORNER-WALL has no declared height and therefore defaults to 4.  Its own endpoint
     ;; remains inclusive in 2D, just as before.
-    (potentially-visible wall-corner-site wall-corner-receiver)
+    (not (potentially-visible wall-corner-site 4 wall-corner-receiver 4))
+    (potentially-visible wall-corner-site 5 wall-corner-receiver 5)
     (not (visible wall-corner-site wall-corner-receiver))
     (= (object-height corner-wall) 4)
     (not (beam-visible wall-corner-site 4 wall-corner-receiver 4))
     (beam-visible wall-corner-site 5 wall-corner-receiver 5)
 
     ;; An undeclared edge defaults to height 3/2.
-    (potentially-visible edge-interior-site edge-interior-receiver)
+    (not (potentially-visible edge-interior-site 3/2 edge-interior-receiver 3/2))
+    (potentially-visible edge-interior-site 5/2 edge-interior-receiver 5/2)
     (not (visible edge-interior-site edge-interior-receiver))
     (= (object-height interior-edge) 3/2)
     (not (beam-visible edge-interior-site 3/2 edge-interior-receiver 3/2))
     (beam-visible edge-interior-site 5/2 edge-interior-receiver 5/2)
 
     ;; Proper gate crossings retain structural LOS with exact conditional occluders.
+    ;; Selection sight ignores a gate, open or closed.
     (bind (los-via
             closed-gate-site $closed-occluders closed-gate-receiver))
     (equal $closed-occluders '(closed-gate))
-    (potentially-visible closed-gate-site closed-gate-receiver)
+    (potentially-visible closed-gate-site 1 closed-gate-receiver 1)
     (not (visible closed-gate-site closed-gate-receiver))
     (not (open closed-gate))
     (not (beam-visible closed-gate-site 4 closed-gate-receiver 4))
@@ -254,7 +260,7 @@
     (bind (los-via
             open-gate-site $open-occluders open-gate-receiver))
     (equal $open-occluders '(open-gate))
-    (potentially-visible open-gate-site open-gate-receiver)
+    (potentially-visible open-gate-site 1 open-gate-receiver 1)
     (visible open-gate-site open-gate-receiver)
     (beam-visible open-gate-site 1 open-gate-receiver 1)
     (open open-gate)
@@ -271,7 +277,7 @@
     (equal $tolerance-occluders '(tolerance-edge))
     (bind (los-via tolerance-right $reverse-occluders tolerance-left))
     (equal $reverse-occluders '(tolerance-edge))
-    (potentially-visible tolerance-left tolerance-right)
+    (potentially-visible tolerance-left 1 tolerance-right 1)
     (visible tolerance-left tolerance-right)
 
     ;; Coincident endpoints have no horizontal interior in which anything can occlude.
@@ -282,8 +288,10 @@
     ;; Both endpoints are inside the boundary, but their line leaves and re-enters through
     ;; the notch.  Both oriented crossing records are retained.  Ordinary sight is opaque;
     ;; a beam at the overridden top 5 blocks and one strictly above it clears.
-    (potentially-visible boundary-left boundary-right)
-    (potentially-visible boundary-right boundary-left)
+    (not (potentially-visible boundary-left 5 boundary-right 5))
+    (potentially-visible boundary-left 6 boundary-right 6)
+    (not (potentially-visible boundary-right 5 boundary-left 5))
+    (potentially-visible boundary-right 6 boundary-left 6)
     (not (visible boundary-left boundary-right))
     (not (visible boundary-right boundary-left))
     (bind (los-barrier-crossings>

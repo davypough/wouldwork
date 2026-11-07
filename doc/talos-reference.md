@@ -199,9 +199,11 @@ action.
 - `select-termini`: while the agent holds a connector, selects 1 or more termini in one
   action, one action per viewpoint. Each child asserts `(selected connector terminus)` for
   a nonempty subset of the eligible termini. Lighting is unaffected.
-  - **Termini:** a terminus qualifies when it is structurally visible (`potentially-visible`,
-    gates ignored) from the agent's current location. Whether the beam actually carries a
-    hue is decided later by live beam visibility from the placement.
+  - **Termini:** a terminus qualifies when it is structurally visible (`potentially-visible`)
+    from the agent's current location: gates (open or closed) and bodies are ignored, but a
+    wall, edge or boundary segment blocks unless a beam from the connector's ground height
+    there to the terminus clears it. Whether the beam actually carries a hue is decided
+    later by live beam visibility from the placement.
   - **Persistence:** a selection survives later loss of sight and later one-way moves
     (jump drops, blowers).
   - **Capacity:** `connector-link-count` counts `paired` and `selected` facts on either

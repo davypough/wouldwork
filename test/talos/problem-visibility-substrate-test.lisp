@@ -90,7 +90,7 @@
   (and
     (not (visible near-site ?object))
     (not (visible-for-object nil near-site ?object))
-    (not (potentially-visible near-site ?object))
+    (not (potentially-visible near-site 1 ?object 1))
     (not (elevation-visible-for-object nil near-site 0 ?object 0))
     (not (elevation-visible-for-object nil near-site -1 ?object 3/2))))
 
@@ -100,7 +100,7 @@
   (and
     (not (visible near-site ?object))
     (not (visible-for-object nil near-site ?object))
-    (not (potentially-visible near-site ?object))
+    (not (potentially-visible near-site 1 ?object 1))
     (not (beam-visible near-site 0 ?object 0))
     (not (beam-visible near-site -1 ?object 3/2))
     (not (beam-visible-for-object nil near-site 0 ?object 0))
@@ -114,7 +114,7 @@
   (and
     (not (visible near-site ?object))
     (not (visible-for-object nil near-site ?object))
-    (not (potentially-visible near-site ?object))
+    (not (potentially-visible near-site 1 ?object 1))
     (not (beam-visible near-site 0 ?object 0))
     (not (beam-visible near-site -1 ?object 3/2))
     (not (beam-visible-for-object nil near-site 0 ?object 0))

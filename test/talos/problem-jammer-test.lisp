@@ -254,7 +254,7 @@
     (has-location floor-jammer floor-site)
     (not (exists (?support support)
            (on floor-jammer ?support)))
-    (not (potentially-visible floor-site floor-site))
+    (not (potentially-visible floor-site 1 floor-site 1))
     (= (jammer-target-elevation floor-target)
        (blower-elevation floor-target))
     (jammer-jams-only floor-jammer floor-target)

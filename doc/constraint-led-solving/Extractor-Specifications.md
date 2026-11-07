@@ -1560,7 +1560,9 @@ Otherwise it reports, all on that state and with the engine's queries:
 - each directed beam live for cutting, its BEAM-CUT value, and each of its
   crossings in source order labelled ACTIVE; REACHED, INACTIVE with the
   other beam NOT LIVE or NOT REACHING; BEYOND CUT at the earlier active
-  crossing; or BEYOND CLOSED gate. A label for a crossing that is not
+  crossing; BEYOND CLOSED gate; BEYOND <kind> <barrier> for a wall, edge
+  or boundary segment the beam does not clear; or BEYOND BODY at <location>
+  for a beam-blocker standing in its path. A label for a crossing that is not
   reached is printed only when the engine's BEAM-REACHES-CROSSING says it is
   not reached; a reason the source rules do not identify is UNEXPLAINED.
 
@@ -1615,7 +1617,8 @@ settings change. No problem object is named in code (C3).
   naming it. PICKUP-CONNECTOR-RETAINING-PAIRINGS keeps the PAIRED facts; a
   held connector has no location, so it neither receives nor sends a beam.
   SELECT-TERMINI, while a connector is held, stores SELECTED facts for 1 or
-  more termini structurally visible (gates ignored) from the agent's
+  more termini structurally visible (gates and bodies ignored, walls
+  blocking by height) from the agent's
   current location, never past *MAX-CONNECTOR-PAIRINGS* links on the
   connector or on a connector terminus, and never for a terminus it is
   already linked to or has selected; selections survive later moves.
