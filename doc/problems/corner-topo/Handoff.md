@@ -14,6 +14,22 @@ transmitter2).  Run on lumpy.
   134.3M states).  Leaving out pending selections loses no plan: they change no beam and only
   use up pairing room, so deleting the select steps that made leftover selections still ends
   in a goal state.
+- Rule change since the proof: the 1,351 goal states (and the backward layers) predate the
+  beam-crossing edits in eea88ff (a beam stops at a wall it cannot clear or at a body in its
+  path and cuts nothing beyond).  Rerun 2026-11-08 under the current rules on the cap-3 copy
+  probs/problem-corner-topo-advisor-cap3.lisp: 1,409 goal states, a strict superset of the
+  1,351 (the 58 new ones all have three placed connectors, nothing held).  So the cap-3 proof
+  holds for the old crossing rule only; not rerun, since the cap is now 4.  Saved as
+  corner-topo-advisor-cap3-goals-new.lisp (project root, fact lists only).
+- Enumerator speedup (2026-11-08): the spec query fluents-feasible? (held-or-placed) is now
+  checked right after the fluent choices, before pairings are enumerated
+  (*enumerator-fluent-check*, enum-make-fluent-check-action).  Cap-3 goal enumeration, serial:
+  30.6M states, 2 h 12 min, against 134.3M states and 4 h 51 min with the check left to
+  finalize.
+- Threaded goal enumeration checked (2026-11-08, first check of this mode): the cap-3 copy on
+  16 threads gives the same 1,409 goal states as the serial run, identical up to connector
+  renaming, with the same 30,611,555 states processed; 15 min 25 s against 2 h 12 min.
+  Saved as corner-topo-advisor-cap3-goals-threaded.lisp (project root).
 - Backward layers (16 threads, all five actions): 1,211 / 1,125 / 61 / 144 new states, then
   layer 5 saturated.  Closed set: 3,892 states, every one with agent1 at location4, and no
   walk anywhere among their predecessors.  So no arrangement with agent1 east of the partition,

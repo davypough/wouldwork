@@ -98,6 +98,12 @@
    When non-nil, applied at ENUM-FINALIZE to prune states before propagation.")
 
 
+(defparameter *enumerator-fluent-check* nil
+  "When non-NIL, a function of (state) that generated enum actions test once every
+   fluent base relation is assigned, before any subset relation.  Bound by
+   FIND-GOAL-STATES to the problem's FLUENTS-FEASIBLE? query, when defined.")
+
+
 (defparameter *enumerator-base-filter-form* nil
   "Lambda form for a goal filter defined via DEFINE-GOAL-FILTER.
    Stored at install time, compiled later by COMPILE-ALL-FUNCTIONS.")
@@ -1765,6 +1771,18 @@ EXTRA-PARTNERS are unioned before filtering/sorting."
    (list nil)))
 
 
+(defun enum-make-fluent-check-action (check)
+  "Create ENUM-FLUENT-CHECK, which runs after every fluent base relation is assigned
+   and before any subset relation, and prunes the branch unless (funcall CHECK state)."
+  (install-enum-action
+   'enum-fluent-check
+   (lambda (state)
+     (when (funcall check state) t))
+   (lambda (state)
+     (make-update-from (copy-state state) nil))
+   (list nil)))
+
+
 (defun enum-split-fluent-keys (all-keys early-types sym-objects)
   "Split ALL-KEYS into early and non-early key lists.
 Early keys must match EARLY-TYPES and must not include symmetric objects."
@@ -2019,9 +2037,11 @@ Early keys must match EARLY-TYPES and must not include symmetric objects."
              (finalize-action (enum-make-finalize-action
                                :propagate finalize-propagate :prefilter prefilter)))
         ;; Assemble in execution order:
-        ;; early-fluents -> main-fluents -> subset -> FINALIZE
+        ;; early-fluents -> main-fluents -> fluent check -> subset -> FINALIZE
         (setf *enum-diag-printed* t)
         (nconc early-actions
                main-actions
+               (when *enumerator-fluent-check*
+                 (list (enum-make-fluent-check-action *enumerator-fluent-check*)))
                subset-actions
                (list finalize-action))))))

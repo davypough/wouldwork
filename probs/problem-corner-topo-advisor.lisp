@@ -130,6 +130,17 @@
   :requires (holding agent1 ?connector))
 
 
+;; Checked once where things are and what is held are chosen, before any pairings are
+;; enumerated: each connector is either at a location or held, never both.  It is the
+;; first part of state-feasible?, so it rejects nothing that check would accept.
+(define-query fluents-feasible? ()
+  (forall (?c connector)
+    (or (and (bind (has-location ?c $loc))
+             (not (holding agent1 ?c)))
+        (and (not (bind (has-location ?c $loc)))
+             (holding agent1 ?c)))))
+
+
 ;; Consistency only, not a guess at the answer.  Applied to goal states and to every
 ;; predecessor.  Each connector is either at a location or held, never both; it has at
 ;; most *max-connector-pairings* pairings and selections, counted on either side; only the

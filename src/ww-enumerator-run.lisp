@@ -266,7 +266,9 @@ worker must print exactly as the caller does for its keys to match the reachable
                                    effective-prefilter invariant-prefilter)
                                   feasibility-prefilter)))
         ;; Dynamic binding provides temporary override for this run.
-        (let ((*enumerator-base-relations* run-base-relations))
+        (let ((*enumerator-base-relations* run-base-relations)
+              (*enumerator-fluent-check* (when (fboundp 'fluents-feasible?)
+                                           (symbol-function 'fluents-feasible?))))
           (let ((*enumerator-ui-settings* goal-run-settings))
             (let ((states (enumerate-state norm-goal-spec
                                            :algorithm algorithm
