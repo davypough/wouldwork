@@ -19,7 +19,7 @@
 ;;;     generated directly and worked backward from, so the search from the start only has
 ;;;     to reach one of them.  The rules and the goal are unchanged.
 ;;;   - The declared facts include a held connector's pending selections, and states that
-;;;     break the rules on those facts (link limit, held-or-placed) are screened out before
+;;;     break the rules on those facts (pairing limit, held-or-placed) are screened out before
 ;;;     they are worked backward from.  The screen enforces rules only; it guesses nothing
 ;;;     about the answer.
 
@@ -33,7 +33,7 @@
 (ww-set *tree-or-graph* graph)
 (ww-set *depth-cutoff* 5)
 (ww-set *symmetry-pruning* t)
-(ww-set *max-connector-pairings* 3)
+(ww-set *max-connector-pairings* 4)
 
 
 (define-types
@@ -115,26 +115,26 @@
   :allow-unassigned t)
 
 
-;; Each connector's pairings, up to the connect limit.  A held connector may keep its
+;; Each connector's pairings, up to the pairing limit.  A held connector may keep its
 ;; pairings (retaining pickup).
 (define-base-relation (paired ?connector ?terminus)
-  :max-per (?connector 3))
+  :max-per (?connector 4))
 
 
 ;; Termini selected for the held connector, not yet paired (they pair at put-down).
 ;; Only the held connector can have selections, so other connectors get none.  Kept
-;; links and selections share the connector's limit of 3.
+;; pairings and selections share the connector's limit of 4.
 (define-base-relation (selected ?connector ?terminus)
-  :max-per (?connector 3)
+  :max-per (?connector 4)
   :shares-max-per (paired)
   :requires (holding agent1 ?connector))
 
 
 ;; Consistency only, not a guess at the answer.  Applied to goal states and to every
 ;; predecessor.  Each connector is either at a location or held, never both; it has at
-;; most *max-connector-pairings* links and selections, counted on either side; only the
+;; most *max-connector-pairings* pairings and selections, counted on either side; only the
 ;; held connector has selections; a terminus is not both paired and selected; and no
-;; connector links to itself or is linked in both directions.
+;; connector pairs with itself or is paired in both directions.
 (define-query state-feasible? ()
   (forall (?c connector)
     (and (or (and (bind (has-location ?c $loc))

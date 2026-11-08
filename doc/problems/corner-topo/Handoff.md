@@ -34,7 +34,8 @@ transmitter2).  Run on lumpy.
   fixed in src/ww-symmetry.lisp, which also now flags a dot-product at any depth.  corner's
   connector symmetry is now dropped by the check (gethash and funcall spots in its beam
   queries); its goal-state count is unchanged.
-- Saved: corner-topo-advisor-predecessors-1..4.lisp in the project root (git-ignored).
+- Saved: corner-topo-advisor-cap3-predecessors-1..4.lisp in the project root (git-ignored;
+  renamed 2026-11-08 so load-predecessors does not pick them up at cap 4).
 Why the old 15-step plan worked: it needed connector1 at location2 with four pairings
 (transmitter2, receiver3, receiver1, and connector3's pairing to it).  Before 2026-11-05 the
 limit of 3 applied to the termini chosen in one connect, and pairings made to a connector by

@@ -39,7 +39,7 @@
 
 (ww-set *symmetry-pruning* t)
 
-(ww-set *max-connector-pairings* 3)  ;max links per connector at any time, either direction (beam-relay)
+(ww-set *max-connector-pairings* 4)  ;max pairings per connector at any time, either direction (beam-relay)
 
 
 ;;;; TYPES ;;;;
