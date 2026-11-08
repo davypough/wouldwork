@@ -30,6 +30,13 @@ transmitter2).  Run on lumpy.
   16 threads gives the same 1,409 goal states as the serial run, identical up to connector
   renaming, with the same 30,611,555 states processed; 15 min 25 s against 2 h 12 min.
   Saved as corner-topo-advisor-cap3-goals-threaded.lisp (project root).
+
+## Cap 4 (2026-11-08)
+*max-connector-pairings* 4 in problem-corner-topo.lisp and problem-corner-topo-advisor.lisp
+(:max-per 4 for paired and selected).
+- Goal states: 10,546 (find-goal-states :exclude-relations selected, 16 threads, 2 h 34 min,
+  115.5M states; 63,276 before connector-renaming dedupe).  Saved as
+  corner-topo-advisor-goals.lisp (project root, fact lists only).
 - Backward layers (16 threads, all five actions): 1,211 / 1,125 / 61 / 144 new states, then
   layer 5 saturated.  Closed set: 3,892 states, every one with agent1 at location4, and no
   walk anywhere among their predecessors.  So no arrangement with agent1 east of the partition,
