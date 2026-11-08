@@ -26,7 +26,14 @@ transmitter2).  Run on lumpy.
   it; define-base-relation :shares-max-per (shared per-key cap across relations); and
   fps-action-object-set no longer narrows select-termini (it reaches the held connector through
   a bound variable, so its predecessors were silently skipped -- symptom "4/5 actions").
-  Regression tests for these changes are still to be run.
+  Regression-tested 2026-11-07: (run-enumerator-checks) passes (corner, 13 goal states),
+  (test-topo) and (test-talos) pass.  The narrowing change also un-narrows START-RECORDER in
+  crelay-topo-2 (it writes the ghosts' facts but takes only the agent), a correction of the
+  same kind.  Found on the way: (stage corner) hung in the symmetry safety check
+  (flow-bind-parameters bound a nested (combination (?t1 ?t2) terminus) as one variable);
+  fixed in src/ww-symmetry.lisp, which also now flags a dot-product at any depth.  corner's
+  connector symmetry is now dropped by the check (gethash and funcall spots in its beam
+  queries); its goal-state count is unchanged.
 - Saved: corner-topo-advisor-predecessors-1..4.lisp in the project root (git-ignored).
 Why the old 15-step plan worked: it needed connector1 at location2 with four pairings
 (transmitter2, receiver3, receiver1, and connector3's pairing to it).  Before 2026-11-05 the

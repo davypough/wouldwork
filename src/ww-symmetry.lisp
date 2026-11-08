@@ -1207,25 +1207,45 @@
 
 (defun flow-bind-parameters (parameters)
   "Bind quantifier-style PARAMETERS' variables to the taint of their domains.  A
-   dot-product pairs its lists by name order, so one over a family is a spot."
+   nested parameter list, eg (combination (?t1 ?t2) terminus), binds each of its
+   variables.  A dot-product, at any depth, pairs its lists by name order, so one over
+   a family is a spot."
   (let ((parameters (if (member (first parameters) *parameter-headers*)
                       parameters
                       (cons 'standard parameters))))
-    (multiple-value-bind (variables types) (dissect-pre-params parameters)
-      (let ((taints (mapcar (lambda (type)
-                              (cond (($varp type) (gethash type *flow-env*))
-                                    ((and (consp type) (member (first type) *query-names*))
-                                     (flow-walk-call type))
-                                    (t (flow-type-taint type))))
-                            (rest types))))
-        (when (and (eq (first types) 'dot-product) (some #'identity taints))
-          (flow-spot :dot-product nil *flow-owner* (reduce #'union taints :initial-value nil)))
+    (multiple-value-bind (nested-variables types) (dissect-pre-params parameters)
+      (let ((variables (alexandria:flatten nested-variables))
+            (taints (mapcar #'flow-domain-taint (flatten-param-types types)))
+            (dot-product-taints (mapcar #'flow-domain-taint (dot-product-param-types types))))
+        (when (some #'identity dot-product-taints)
+          (flow-spot :dot-product nil *flow-owner*
+                     (reduce #'union dot-product-taints :initial-value nil)))
         (if (= (length variables) (length taints))
           (loop for variable in variables
                 for taint in taints
                 do (flow-env-merge variable taint))
           (dolist (variable variables)
             (flow-env-merge variable (reduce #'union taints :initial-value nil))))))))
+
+
+(defun flow-domain-taint (type)
+  "Return the taint of parameter domain TYPE: a $variable's taint, a query call's
+   result taint, or the families among a type's instances."
+  (cond (($varp type) (gethash type *flow-env*))
+        ((and (consp type) (member (first type) *query-names*))
+         (flow-walk-call type))
+        (t (flow-type-taint type))))
+
+
+(defun dot-product-param-types (types)
+  "Return the leaf type specs of TYPES, as from DISSECT-PRE-PARAMS, that lie under a
+   DOT-PRODUCT header at any nesting depth."
+  (if (eq (first types) 'dot-product)
+    (flatten-param-types types)
+    (mapcan (lambda (item)
+              (when (and (consp item) (member (car item) *parameter-headers*))
+                (dot-product-param-types item)))
+            types)))
 
 
 (defun flow-walk-loop (form)
