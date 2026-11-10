@@ -280,13 +280,17 @@ relay (R4 confirmed it; an R8 overlap of load and relay).
 
 Examples (crelay-topo backward analysis, 2026-10-18).  Step 6 first proposed the ghost's walk
 into location11-13 as the last action, missing that switch2 had to be turned on first;
-ordering the actions that make each needed fact true would have shown it.  A pairing rule
-was stated from one code path (pairing only from location9) and corrected: the engine judges
-from every spot the agent can currently reach.  A copy shortage (four jobs, three copies)
-flagged at step 5 stayed open through step 11; D's backtrack to step 4 option (b) relieved
-it, because the ghost moves copies between jobs during the recording (connector1* keeps
-gate3 open early and feeds the beam late: R8, roles in sequence).  Cycle 3 was then written
-forward from the chain map and validated on its first replay.
+ordering the actions that make each needed fact true would have shown it.  A pairing rule was
+stated from one code path (pairing only from location9) and corrected from source.  (Since
+2026-11-07 a held connector selects termini only from the agent's current location, walls
+block that sight unless the beam clears them, and selections accumulate across locations.)  A
+copy shortage (four jobs, three copies) flagged at step 5 stayed open through step 11; D's
+backtrack to step 4 option (b) relieved it, because the ghost moves copies between jobs during
+the recording (connector1* keeps gate3 open early and feeds the beam late: R8, roles in
+sequence).  Cycle 3 was then written forward from the chain map and validated on its first
+replay.  When the 2026-11-07 selection change broke it, a replay from the start found the
+failing step (2026-11-10): after a tech change alters a rule an accepted solution relies on,
+replay that solution from the start.
 
 ## Realizing a subgoal
 

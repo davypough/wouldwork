@@ -17,7 +17,9 @@
     (put-connector > agent1 puts connector3 on ground at location3)
     (move > agent1 moves via ((ladder location3 (ladder1) location2)))
     (pickup-connector > agent1 picks up connector2 at location2)
-    (select-termini > agent1 selects (connector3 receiver2) for connector2 at location2)
+    ;; receiver4 added 2026-11-10 after play in the game: once lit, connector2's beam to
+    ;; receiver4 cuts blue low on its line, so gate2 stays open when agent1 leaves the blue beam
+    (select-termini > agent1 selects (connector3 receiver4 receiver2) for connector2 at location2)
     (put-connector > agent1 puts connector2 on ground at location2)
     (move > agent1 moves via ((walk location2 nil location8)))
     (move > agent1 moves via ((walk location8 (gate2) location3)))

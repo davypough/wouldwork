@@ -1,5 +1,6 @@
 # intersect — Handoff
-Updated 2026-11-10.  Status: solving advisor, goal reached by replay: 40 actions (SG1 8 +
+Updated 2026-11-10.  Status: SOLVED in the game by D (sigil collected) with the 40-action
+plan; solving advisor, goal reached by replay: 40 actions (SG1 8 +
 SG2 11 + SG3 21); spec revision 4 (location10 (8, 1), location11 (2, 15) added; location4
 and location5 removed for the 999-object limit).
 Problem spec: probs/problem-intersect.lisp.
@@ -7,7 +8,8 @@ Corresponding diagram (Talos only): doc/problems/intersect/intersect-diagram.png
 yet show location10, location11).
 
 ## Next step
-D: play the 40-action plan in the game.  Optional: a search for a shorter plan.
+None required.  Optional: a search for a shorter plan; D re-runs Actions.lisp to refresh
+Validation.txt after the step-14 change.
 
 ## State
 Accepted actions in Actions.lisp: 40 (cloud replay and D's local validation, 2026-11-10: success T, goal satisfied).
@@ -27,3 +29,4 @@ take (action-sequence-validation-final-state *accepted-validation*).
 - No static profile on file (the stale one was removed); regenerate if needed.
 - The diagram does not show location10, location11 (D's drawing).
 - 999-object limit: Schema-Gaps.txt, NEED of 2026-11-10 (open).
+- Engine/game differences found in play: Schema-Gaps.txt, NEEDs of 2026-11-09 and 2026-11-10.

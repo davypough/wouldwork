@@ -1,5 +1,5 @@
 ;;; crelay-topo -- accepted actions from the original start.
-;;; Load after (stage crelay-topo-1), in a separate top-level form.
+;;; Load after (stage crelay-topo), in a separate top-level form.
 (in-package :ww)
 
 (defparameter *accepted-actions*
@@ -48,13 +48,17 @@
     (toggle-switch agent1 switch1)
     (put-box agent1 box1 tray1* location5)
     (toggle-switch agent1 switch1)
-    ;; agent1 fetches connector1 from plate1 and connects it onto box1 from location20
+    ;; agent1 fetches connector1 from plate1, selects repeater1 at location9 and receiver1
+    ;; at location12, and puts connector1 onto box1 from location20
     (move agent1 ((walk location4 (gate1) location2)))
     (pickup-connector agent1 connector1 location2)
-    (move agent1 ((walk location2 (gate1) location4)))
+    (move agent1 ((walk location2 (gate1 gate3) location9)))
+    (select-termini > agent1 selects (repeater1) for connector1 at location9)
+    (move agent1 ((walk location9 (gate5) location12)))
+    (select-termini > agent1 selects (receiver1) for connector1 at location12)
+    (move agent1 ((walk location12 (gate3 gate5) location4)))
     (move agent1 ((step (location4 ground) nil (location4 blower1))))
     (toggle-switch agent1 switch1)
-    (select-termini > agent1 selects (repeater1 receiver1) for connector1 at location20)
     (put-connector > agent1 puts connector1 on box1 at location5)
     (toggle-switch agent1 switch1)
     ;; ghost carries the load into location12 and stands on plate5

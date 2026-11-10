@@ -704,6 +704,19 @@ Replay, 2026-10-18 (SBCL 2.2.9 container): after (stage crelay-topo-1), loading 
 79 actions, SUCCESS-P T, GOAL-CHECKED-P T, GOAL-SATISFIED-P T; VALIDATE-RECORDER-SOLUTION
 ACCEPTED; Validation.txt written (container copy).  It was right the first time.
 
+**SG3 repair (2026-11-10).**  Commit eea88ff (2026-11-07) made selection sight wall-aware:
+POTENTIALLY-VISIBLE now lets a wall block unless the beam clears it.  From location20 the lines
+to repeater1 (wall9, wall7) and receiver1 (wall7, wall3) are blocked, so step 2's selection of
+(repeater1 receiver1) failed at action 45.  Selection sight now (connector on the ground):
+repeater1 from location8, 9; receiver1 from location12, 13, 15-18, 21; transmitter1 from
+location3, 7, 8, 9.  No location sees both repeater1 and receiver1, so selections accumulate:
+agent1 carries connector1 from plate1 to location9 (selects repeater1) and location12 (selects
+receiver1), walks back to location4, rides blower1 up and puts connector1 on box1 from
+location20 as before.  Putting connector1 on box1 at location12 instead fails: the top of box1
+on the ghost's tray is beyond agent1's placement reach from the ground.  Replay 2026-11-10 (SBCL
+2.1.11, Linux VM), after (stage crelay-topo): 84 actions, all three flags T,
+VALIDATE-RECORDER-SOLUTION ACCEPTED.
+
 The 2026-10-06 measurements (serial goal chaining) are kept below for comparison.
 
 **SG1.** From (stage crelay-topo-1), serial:
@@ -728,6 +741,7 @@ doc/solving-advisor.md, *Choosing a subgoal*.
 
 ## Result
 
+2026-11-10: 84 actions (SG1 9, SG2 19, SG3 56) after the SG3 repair above.
 2026-10-18: a complete solution of 79 actions (SG1 9, SG2 19, SG3 51), validated from the start in
 the container (SBCL 2.2.9): goal satisfied and the recorder's solution validator accepted.  SG3 is
 a candidate until D replays Actions.lisp on Windows, which writes Validation.txt.  Derived

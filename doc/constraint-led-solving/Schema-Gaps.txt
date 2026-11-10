@@ -244,6 +244,10 @@ Acceptance   D's ruling per beam problem; with a guard, intersect SG2's
              location8 -> gate2 move is rejected and test-topo/test-talos
              recordings are re-checked.
 Status       Open; to check for other problems later (D, 2026-11-09).
+             2026-11-10: when D played intersect in the game the move was
+             avoided, not tested: connector2 was given a beam to receiver4
+             that keeps gate2 open without the body (Briefing, Played in the
+             game).  The game's behaviour for this move is still unobserved.
 
 
 NEED -- More than 999 planning objects (2026-11-10)
@@ -265,4 +269,31 @@ Dependencies src/ww-converter.lisp (object indices, convert-to-integer);
              tech/-beam-los-coordinates.lisp (crossing record derivation).
 Acceptance   intersect stages with all 11 locations and the accepted 40
              actions still replay to the goal; test-topo and test-talos pass.
+Status       Open; not approved for implementation.
+
+
+NEED -- Two stable beam arrangements; the game keeps the first (2026-11-10)
+--------------------------------------------------------------------------
+Origin       intersect, play in the game by D with A watching, 2026-11-10.
+Need         Where a relay's feed beam and a second beam cross a third beam at
+             two points, two arrangements can both be self-consistent: relay
+             lit (its own beam cuts the third beam before that beam reaches
+             the feed) or relay dark (the third beam cuts the feed, so the
+             relay's line is only a pairing and cuts nothing).  In the game the
+             arrangement depends on history: a beam that already exists wins,
+             and a connector placed into a cut feed stays dark until the
+             cutting beam is interrupted (D stood in it).  The engine picks one
+             arrangement from the state alone: for intersect it chose lit
+             after step 7 (the game showed dark) and dark after step 17 (the
+             game stayed lit).  Plans can therefore replay in the engine yet
+             need an extra body-block step in the game, or the reverse.
+Proposed scope  Decide whether beam state must carry history (which beams
+             were live before the action) or whether a rule from the state
+             alone can match the game: for example, a newly placed connector
+             never wins against an existing beam.
+Dependencies tech/beam-relay.lisp, tech/beam-crossing.lisp (settling of
+             mutually dependent crossings); recorded solutions.
+Acceptance   intersect's step 7 leaves gate2 closed until agent1 interrupts
+             blue, and gate2 stays open after agent1 leaves the beam at
+             step 17; test-topo and test-talos recordings re-checked.
 Status       Open; not approved for implementation.

@@ -250,8 +250,30 @@ planning objects exceeds 999", crossing records), so location4 and location5 wer
   plate1 paired with connector2 and receiver4: red location9 -> location6, gate4 opens.
 Not shown shortest (no search run).  The put on a plate is `on plate1`, not `on ground`.
 
+**Played in the game (D, 2026-11-10; A watching by screenshots and suggesting each chunk).**
+The 40-action plan reaches the sigil, with two differences from the engine's account.
+1. Two stable beam arrangements.  After step 7 (connector2 at location2 selecting receiver4,
+   receiver2, transmitter2) gate2 stayed closed: blue cut transmitter2's beam to connector2
+   at their crossing, so connector2 was dark and its line to receiver4 was only a dashed
+   pairing line that cuts nothing.  The engine had settled on the other arrangement
+   (connector2 lit, its receiver4 beam cutting blue lower down).  Both are self-consistent;
+   the game keeps whichever was reached first.  Switch-over: D stood in the blue beam near
+   gate1 until connector2 lit and its receiver4 beam appeared, then stepped out; blue was
+   then cut at the lower crossing and gate2 stayed open.
+2. Gate2 on the second exit.  The plan held gate2 open with agent1's body at location8 and
+   walked to the gate (the Schema-Gaps NEED of 2026-11-09).  A expected the game to close
+   gate2 once agent1 left the beam (not tested).  Step 14 was changed to select connector3,
+   receiver4 and receiver2, and the same switch-over was used: gate2 then stayed open on
+   its own.  The changed step also replays in the engine (cloud, 40 actions, success T, goal
+   satisfied); there gate2 is open only while agent1 is at location8.
+Everything else played as planned: connector3 at location11 with receiver3, connector2 at
+location9 with receiver2 and transmitter2, connector1 at location10 with connector3,
+receiver1 and transmitter1 (gates 1, 2 and 3 open together), connector3 on plate1 with
+connector2 and receiver4.  Method notes for such sessions: `doc/simulation/operations.md`.
+
 ## Result
 
 Reached 2026-11-10: 40 actions (SG1 8 + SG2 11 + SG3 21) in `Actions.lisp`, replay success
 T, goal satisfied (cloud; confirmed by D's local validation, 2026-11-10).  A valid plan;
-minimal length not established.  Not yet played in the game by D.
+minimal length not established.  Solved in the game by D on 2026-11-10 with this plan
+(sigil collected); see *Played in the game* above for the two differences.

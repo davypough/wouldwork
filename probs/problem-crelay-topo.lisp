@@ -2,6 +2,21 @@
 
 ;;; Coordinate/topology-driven version of Purgatory 'Connector Relay' problem.
 
+;;; The enumeration metadata at the end (base-relation declarations) is not rules; it
+;;; serves find-predecessors and find-state-predecessors.
+
+;;; Design notes:
+;;;   - Solved as a chain of milestones, each a short min-length search with SOLVE-SUBGOAL;
+;;;     a single search over the whole plan (some 80 moves) is far out of reach.
+;;;   - A milestone names a resting state that later steps depend on (an object on a plate,
+;;;     a gate held open), plus (recorder-cycle-ended) when the next leg needs the recorder.
+;;;   - A SOLVE-SUBGOAL leg may stay inside a recorder cycle, close one, or span cycles;
+;;;     milestones partway through a cycle are expected.  The recorder cap stays unlimited
+;;;     so the chain as a whole can use as many cycles as it needs.
+;;;   - The depth cutoff is a per-leg default of about one searchable leg; raise it at the
+;;;     REPL for a longer leg.
+;;;   - The generic lower bound reads the active subgoal, so it prunes every leg.
+
 
 (in-package :ww)
 
@@ -10,10 +25,9 @@
 (ww-set *problem-type* planning)
 (ww-set *solution-type* min-length)
 (ww-set *tree-or-graph* graph)
-(ww-set *progress-reporting-interval* 1000000)
 (ww-set *max-recorder-cycles* nil)
 (ww-set *max-connector-pairings* 3)
-(ww-set *depth-cutoff* 15)
+(ww-set *depth-cutoff* 12)
 
 
 (define-types
@@ -54,7 +68,7 @@
 (include-tech walkability)
 (include-tech visibility)
 (include-tech reachability)
-(include-tech topo-lower-bound)  ;admissible finite-resource bound; prunes on the cutoff before any solution exists
+(include-tech topo-lower-bound)  ;admissible bound on the active (sub)goal; prunes on the cutoff
 (include-tech recorder)
 
 
@@ -201,3 +215,26 @@
 
 (define-goal
   (has-location agent1 location19))
+
+
+;;;; ENUMERATION METADATA ;;;;
+
+;; Facts the predecessor enumeration re-guesses.  Held cargo other than a tray has no
+;; location, and ghosts have none while no recording is open, so locations may be unassigned.
+(define-base-relation has-location
+  :allow-unassigned t)
+
+
+;; What each agent holds: nothing, or one object.
+(define-base-relation holding
+  :allow-unassigned t)
+
+
+;; What each object rests on: the ground (no fact), a plate, a box, a held tray, the blower.
+(define-base-relation on
+  :allow-unassigned t)
+
+
+;; Each connector's pairings, up to the connect limit.
+(define-base-relation (paired ?connector ?terminus)
+  :max-per (?connector 3))
