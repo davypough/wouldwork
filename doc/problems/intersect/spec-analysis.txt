@@ -1,6 +1,7 @@
 PROBLEM / REVISION / AUTHORIZED SCOPE
   Active record: doc/problems/intersect/spec-analysis.txt.
-  Specification: probs/problem-intersect.lisp, revision 2 (2026-11-07: location8 added);
+  Specification: probs/problem-intersect.lisp, revision 3 (2026-11-08: location9 added);
+  revision 2 2026-11-07 (location8 added);
   revision 1 complete 2026-11-05.
   Scope approved by user 2026-11-05: draft the spec section by section; read tech sources
   (gate, plate, beam-relay, beam-crossing, walkability, visibility, reachability, ladder,
@@ -217,3 +218,7 @@ CORRECTIONS AND HISTORY
      matches the central-room placement.  No REACH-VIA facts (nearest location, L1, is 3
      away, beyond the 5/2 reach limit).  Depth 7, *threads* 16: 5,705 states, 3,509 repeats,
      10 inconsistent abandoned, no solution, 0.7 s.  Windows staging not yet confirmed.
+  15. Revision 3: location9 (L9) at (10,8) added (user, 2026-11-08; problem analysis rev 5),
+     made in the solving-advisor session.  Edit: location9 in the location type;
+     (location-coords> location9 10 8).  Staging, walking/visibility review and the static
+     profile regeneration: pending.

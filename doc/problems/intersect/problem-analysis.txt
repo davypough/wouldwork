@@ -1,10 +1,11 @@
 PROBLEM / REVISION / SOURCES / AUTHORIZED SCOPE
-  Problem: intersect (diagram title INTERSECTIONS).  Revision 4, 2026-11-07 (rev 3 2026-11-05; rev 2 consolidated 2026-11-04).
+  Problem: intersect (diagram title INTERSECTIONS).  Revision 5, 2026-11-08 (rev 4 2026-11-07; rev 3 2026-11-05; rev 2 consolidated 2026-11-04).
   Sources: doc/problems/intersect/intersect-diagram.png; symbol key from
   doc/problems/rumin-topo/diagram.png; user clarifications in dialogue 2026-11-04
   (apparatus offsets, starts, controls, goal, ladder LD1 added in dialogue);
   user corrections 2026-11-05 (L2 relocated, L8 removed, LD1 retargeted to L2);
-  user addition 2026-11-07 (new L8 at (15,8), diagram updated).
+  user addition 2026-11-07 (new L8 at (15,8), diagram updated);
+  user addition 2026-11-08 (new L9 at (10,8), central room).
   Record: doc/problems/intersect/problem-analysis.txt.
   Scope: problem-advisor analysis only.  No spec, measurement, or search authorized.
 
@@ -85,7 +86,8 @@ JUSTIFIED DESIGN  (all agreed by user 2026-11-04)
      would require solving.  Reconsider: search advisor may test omission as a speed-up.
      put-connector needed (cheapest way to hold P1 with an unlinked connector).
   D4 *max-connector-pairings* 3 (user: probably needed; one input + two outputs).
-  D5 Locations L1-L8 as given (L8 added by user 2026-11-07 for the third subgoal leg).
+  D5 Locations L1-L9 as given (L8 added by user 2026-11-07 for the third subgoal leg;
+     L9 added 2026-11-08 for the red feed to the west room).
      Reconsider if a needed beam line has no location.
   D6 Coordinate-derived geometry (walls, windows, gates, fixtures, locations), as in
      rumin-topo; required for exact crossings.
@@ -159,3 +161,9 @@ CORRECTIONS
   - Rev 4 (user, 2026-11-07): new location L8 at (15,8) in the central room, added to the
     diagram; the user needs it for the third leg of subgoaling (L3 -> L5).  Area membership
     and the forced gate order are unchanged.  Locations now L1-L8.
+  - Rev 5 (user, 2026-11-08): new location L9 at (10,8) in the central room, west of the
+    x=15 blue line.  Found by the solving advisor (SG3): with L1-L8 every red feed to the
+    west room (from L2, L3 or L8) stops blue reaching R3b, so G3 cannot be recrossed.
+    From L9 a connector sees T2r and, through WIN3 and WIN4, L6 and R4r, without crossing
+    x=15.  The user confirms a connector can be placed there in the level.  Area membership
+    and the forced gate order are unchanged.  Locations now L1-L9.

@@ -1,11 +1,12 @@
 # intersect — Briefing (solving advisor)
 
-Started 2026-11-07.  Spec: `probs/problem-intersect.lisp` (revision 2, location8 added).
+Started 2026-11-07.  Spec: `probs/problem-intersect.lisp` (revision 3, location9 added
+2026-11-08; revision 2 added location8).
 Diagram: `doc/problems/intersect/intersect-diagram.png`.
 Static profile: `doc/problems/intersect/Constraint-Static-Profile.txt`, generated
 2026-11-07 on the corrected engine (see *Engine corrections*), SHA-256
 `edb0fbaea1d96429415ecaefe967a886366a7c28fa2b48ab69c4a8c06530e8f5`.  8 of 8 technologies
-covered, 0 UNCOVERED.
+covered, 0 UNCOVERED.  Stale since revision 3 (location9); regenerate before relying on it.
 
 ## Spec-diagram check
 
@@ -69,6 +70,8 @@ None needed (0 UNCOVERED).
 | subgoal | whose idea | check | route | result |
 |---|---|---|---|---|
 | SG1 agent1 at location3 | D's milestone (L3 by ~9) | replay from start | one plain search | 8 steps, accepted 2026-11-07 |
+| SG2 agent1 at location5 | D's milestone (L5 by ~23) | replay from start | one plain search | 11 steps, accepted 2026-11-08 |
+| SG3 exit to location3 with relay at location9 | A's backward reading, agreed by D | search from SG2 endpoint | one plain search | none within 14 (lumpy, 2026-11-08; again on probe copy intersect-1, 2026-11-09) |
 
 **SG1.**  Search: state start, `(solve-subgoal *start-state* (has-location agent1 location3))`,
 cutoff 10, min-length, threads 16, lower-bound pruning off; 0.8 s, 3,521 states, one
@@ -82,8 +85,139 @@ Endpoint review: agent1 at location3 empty-handed; connector3 at location3; gate
 open, gate3 closed (receiver3 dark); connector1 holds 3 pairings (full), connector2 holds
 3 (full), connector3 none.  The ladder returns agent1 to location2 only empty-handed.
 
-Next (A's choice of depth, rule revised 2026-11-07): SG2 toward location5, cutoff 14
-(D's count for the leg is about 14).
+**SG2.**  SG1 first re-replayed on the current engine (after the symmetry and pairing
+commits of 2026-11-07/08): same endpoint.  Search: state start,
+`(solve-subgoal <SG1 endpoint> (has-location agent1 location5))`, cutoff 14 (A's choice:
+D's count of about 14 for the leg), min-length, threads 16, lower-bound pruning off;
+completed normally in 260 s, 955,782 states, 3 solutions, shortest 11 (cloud SBCL 2.2.9,
+2 cores).  Expected (reading): gate2 and gate3 compete, so a ladder trip back to the
+central room, with agent1's body at location8 blocking blue while gate2 is crossed.
+Result: as expected, with connector3 as the red feed:
+- connector3 at location3 is paired with transmitter2 (location3 sees it through window1).
+- After the ladder climb, connector2 is picked up (clearing all three of its pairings,
+  including the sacrifice to receiver4) and re-paired with connector3 and receiver2:
+  red runs transmitter2 -> connector3 -> connector2 -> receiver2.
+- transmitter2's beam to connector3 crosses blue on the x = 15 line (about (15, 11.6)).
+  With agent1 at location8 blue stops at its body below that crossing, so red survives
+  and gate2 opens; when agent1 walks location8 -> gate2 -> location3 the crossing cuts
+  both (crossing60), so gate2 closes behind it.
+- Picking up connector3 at location3 removes the red beam, blue reaches receiver3, gate3
+  opens, and agent1 walks location3 -> gate3 -> location5 carrying connector3.
+Replayed from the start by `Actions.lisp` (19 actions): success T, goal not yet satisfied.
+Endpoint review: agent1 at location5 holding connector3; connector1 at location1 paired
+with transmitter1, receiver1, receiver3 (blue lit, gates 1 and 3 open); connector2 at
+location2 paired with receiver2 only (unlit; gate2 closed); receiver4 dark.  gate3 stays
+open while blue reaches receiver3, so agent1 can still return east.
+Look-ahead for gate4 (open question): it needs receiver4 red and plate1 pressed; red
+comes only from transmitter2 in the central room, and red beams toward receiver4 cross
+the blue x = 15 line, so blue must be stopped or cut first.
+
+**SG3 dialogue (2026-11-08).**  Target: gate4 open with agent1 west of it (receiver4 red,
+plate1 pressed; D: a connector on plate1 can do both, from location6).
+Finding (A, from coordinates; reading, not replayed): with locations 1-8, red reaches the
+west room only from a connector at location2, location3 or location8 paired with
+transmitter2; no west location sees transmitter2 (location5's line hits wall9 at (5, 10.3)).
+transmitter2's beams to location2 and location3 cross blue's x = 15 line at (15, 9.81)
+and (15, 11.65), and a connector at location8 blocks blue with its body; receiver3 is lit
+only by blue up that line.  So gate3 is closed whenever a red feed exists, yet agent1 must
+lay the feed in the central room and then recross gate3 west: CONTRADICTED.  Relay at
+location4 (D's idea): its lines to location6, location5 and receiver4 hit wall10 or wall9:
+CONTRADICTED (reading).
+Resolution (D, 2026-11-08): new location9 at (10, 8), spec revision 3.  From location9 a
+connector sees transmitter2 (line clears wall10 at x = 9.1) and location6 through window3
+and window4, all west of x = 15, so the feed need not cut blue.  Likely chain:
+transmitter2 -> relay at location9 -> connector on plate1 at location6 -> receiver4.
+SG1 + SG2 re-replayed on revision 3 (D, 2026-11-08): success T, same endpoint.
+Backward reading (A): the last exit from the central room through gate2, with the relay
+already at location9, seems to need four connectors at once (connector1 for blue, the
+relay, one at location2 lighting receiver2, one at location3 holding the removable
+transmitter2 pairing); the relay's beams to receiver2 and location2 cross blue at
+(15, 6.84) and (15, 7.09), below agent1's body at location8.  Unchecked; SG3 tests it.
+**SG3 (agreed with D 2026-11-08).**  Goal: agent1 at location3, receiver3 active, and a
+connector at location9 paired with transmitter2.  State start (SG2 endpoint), cutoff 14
+(A's hand count about 12), min-length, threads 16, lower-bound pruning off; cloud SBCL
+2.2.9, 2 cores.  Stopped by A at its 15-minute limit: TRUNCATED, not a bound.  3,012,105
+states at 529 s (last report; about 3,600 states/s), max depth 14 reached, b* 2.81,
+75.7% repeats, 0 solutions.  (Cutoff 4 check: 1,040 states, none.)  For comparison SG2's
+whole cutoff-14 search was 955,782 states.
+Lumpy run (D, 2026-11-08, same forms, 16 threads): completed normally, cutoff 14, max
+depth 14, 4,542,235 states, 76.2% repeats, 77,054 inconsistent abandoned, 220 s, no
+solution.  Bound: no plan of 14 or fewer steps reaches SG3 from the SG2 endpoint.
+Consistent with the four-connector reading (A's hand count for an exit was about 12);
+not a refutation.
+R4 replay (A, 2026-11-09, cloud SBCL 2.2.9; D's question: can the location9 connector
+light receiver2?).  From the SG2 endpoint: connector3 put at location5, location5 ->
+gate3 -> location3, ladder to location2, connector2 picked up and given receiver2 and
+transmitter2, carried to location9 and put down; then agent1 to location8.  Result:
+connector2 red, crossing227 active (its beam to receiver2 x blue at (15, 6.84)),
+receiver2 and receiver3 both dark, gates 2 and 3 closed, before and after agent1 stands
+at location8.  CONTRADICTED (measured).
+
+Probe copy `probs/problem-intersect-1.lisp` (2026-11-09, D's suggestion): location8 moved
+from (15, 8) to (15, 25/4), on blue's line just north of gate1 (y = 13/2 would put the body
+within the 1/2 occlusion tolerance of the location9 -> receiver2 beam).  R4 replay (A,
+cloud): SG1 + SG2 replay success T on the copy; then connector3 left at location5,
+ladder, connector2 paired with receiver4, receiver2, transmitter2 and put at location9:
+crossing234 active, receiver2 dark; agent1 to location8: receiver2 lit, gate2 open; walk
+location8 -> gate2 -> location3 succeeds; then crossing234 active again, receiver2 and
+receiver3 dark, gates 2 and 3 closed (as read).  receiver4 stayed dark: connector3 at
+location5 blocks the location9 -> receiver4 beam with its body.
+SG3 on the copy (D, lumpy, 2026-11-09): completed normally, cutoff 14, 4,448,758 states,
+239 s, no solution.  Bound relative to the copy, start and cutoff.
+Game facts (D, 2026-11-09): 3 connectors; receiver2 faces west; crossing beams always
+cut; a carried connector keeps pairings but sends no beam until put down; closed gates
+block beams (not pairings); a gate pushes objects out of its gateway and closes; no low
+walls or raised places; windows barred; a connector must be put down before climbing.
+All match the spec.  Locations are D's estimates, so placement is open.
+Premise ledger (A, R5).  P1 the receiver2 lighter at agent1's last gate2 exit must stay
+placed afterwards; connector1 must be at location1 and connector3 must end on plate1, so
+it is the final red relay, lit for good by its transmitter2 pairing (read).  P2 receiver3
+is lit only by blue up x = 15 from (15, 5) (read).  P3 sweep (A, Python, 0.1 grid, walls,
+gate1 open, other gates closed, facing): 15,191 points see both transmitter2 and receiver2;
+every one has a beam to them crossing blue's line or lies within 1/2 of it (measured,
+geometry only).  So after the last gate2 exit blue stays cut and gate3 cannot reopen,
+wherever locations are placed.  A solution exists, so a premise or a game rule differs.
+Oscillation (D, 2026-11-09): in the game, connector1 at location1 (transmitter1, receiver1,
+receiver3), connector2 at location2 (receiver2, transmitter2) and connector3 at location3
+(transmitter2, receiver4) make a triangle of crossings, (15, 8), (15, 9.81), (17.85, 8),
+whose sides go dark in rotation about once a second; no receiver flickers.  Reading (A):
+each beam's first crossing is another's second, so each is always cut at one of its two
+crossings and never reaches past the triangle; a pure loop cannot flicker a receiver, only
+one fed back through a relay it switches.  R4 replay (A, cloud, 2026-11-09): from the SG2
+endpoint, connector3 paired and put at location3 (crossing224 active), then connector2
+paired with receiver2 and transmitter2 and put at location2: state dropped as
+inconsistent.  The engine settles a two-way flip-flop (union or arbitration) when the
+result holds, and drops anything else, so plans through oscillating states are invisible
+to search.
+Feedback-oscillation search (A, 2026-11-09, Python beam-dynamics sketch in the cloud
+container, not the engine: each tick a beam stops at its first crossing with a beam that
+reached that point the tick before; relays light from incoming beams; bodies block within
+1/2; it reproduces D's rotating triangle).  Searched relay connector2 over points seeing
+transmitter2 and receiver2, connector3 over the west room with any pairings (connector1
+excluded: full), agent1 at location3.  Found: connector2 at location9 paired with
+transmitter2, receiver2, connector3; connector3 at about (0.25-1.25, 10.25-11.25) (west wall,
+north of location6) paired with connector2 and receiver2.  connector3's beam to receiver2
+(through window4 and window3) crosses connector2's feed from transmitter2 at about
+(9.8, 8.4), just short of location9: connector2 lit -> connector3 lit -> feed cut ->
+connector2 dark -> connector3 dark -> feed restored.  While connector2 is dark its beam to
+receiver2 no longer cuts blue at (15, 6.84), and connector3's beam is cut before blue, so
+receiver3 lights: in the sketch receiver3 is lit about 40% of the time with agent1 at
+location3, and receiver2 about 45% with agent1's body on blue at (15, 6.25) (0% at
+(15, 6.5), where the body blocks connector2's beam to receiver2).  Candidate ending: sprint
+through gate2 and then gate3 in open phases; pick up connector3, pair it with connector2
+and receiver4 on plate1; gate4.  Unverified in game; the engine drops these states.
+In-game test (D, 2026-11-09): no oscillation.  connector3's beam to receiver2 is limited to
+the band between window4's top corner and wall4's top corner; at its north end connector2
+cannot sit south of it and still see receiver2 past wall4, so the feed is never crossed.
+Sketch re-run with a 1/2 clearance from wall corners: the only family left needs connector3
+within 1/2 of window4's corner, i.e. none in practice.  The sketch found no other family
+(connector2 anywhere seeing transmitter2 and receiver2; connector3 anywhere west, north
+strip included, with any pairings).
+
+Gate passage while body-blocking (D, 2026-11-09): the engine lets agent1 walk through a
+gate held open only by its own body in a beam (SG2's location8 -> gate2 move); plates are
+already strict.  D keeps the engine as is for intersect; check other problems later
+(Schema-Gaps.txt, NEED of 2026-11-09).
 
 ## Result
 

@@ -990,12 +990,13 @@ a disjunction, where a controller some clause avoids is not forced."
 
 
 (define-problem-helper topo-resource-receiver-cost (receiver facts tasks)
-  "One CONNECT to light RECEIVER, plus one PICKUP unless a connector is already held.
+  "One CONNECT to light RECEIVER, plus one PICKUP unless a connector is already held, plus
+one SELECT-TERMINI while no pairing or selection exists anywhere.
 
 No permissive structural beam path reaching the receiver means moving an occluder cannot
 create one, so under the standard relay provider at least one pairing PUT-CONNECTOR is
-required.  CONNECT stays one step although pairing also needs a SELECT-TERMINI: the charge
-remains admissible, only looser.
+required.  That put pairs only what is selected or retained, so with neither present it
+must follow a SELECT-TERMINI (see TOPO-RESOURCE-PAIRING-FREE-P).
 The abstentions match TOPO-CONTROL-BEAM-LINK-STATUS: an unmodelled provider, a problem with
 no connector, and a connector whose placement the manipulation component already charges each
 cost nothing.  The structural test is last because it is the only expensive one."
@@ -1006,7 +1007,19 @@ cost nothing.  The structural test is last because it is the only expensive one.
           (topo-resource-charged-type-p tasks 'connector)
           (topo-beam-structurally-linked-p receiver facts))
     0
-    (if (topo-resource-holding-type-p facts 'connector) 1 2)))
+    (+ (if (topo-resource-holding-type-p facts 'connector) 1 2)
+       (if (topo-resource-pairing-free-p facts) 1 0))))
+
+
+(define-problem-helper topo-resource-pairing-free-p (facts)
+  "Whether no PAIRED or SELECTED fact exists, in FACTS or among the static links.
+Only then must every pairing PUT-CONNECTOR follow a SELECT-TERMINI: a pending selection
+pairs at put-down, PICKUP-CONNECTOR-RETAINING-PAIRINGS carries pairings to a new spot, and
+a recorder fork copies only pairings and selections that already exist."
+  (and (notany (lambda (fact)
+                 (member (first fact) '(paired selected) :test #'eq))
+               facts)
+       (null (topo-beam-static-links 'paired))))
 
 
 (define-problem-helper topo-resource-plate-cost (plate facts targets)

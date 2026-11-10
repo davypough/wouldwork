@@ -217,3 +217,30 @@ Status       Done 2026-10-17 (plan claude/settling-predecessors-plan.md):
              a mobile support of the other recorder layer.  S4: 27, the true
              one listed, the two ghost-on-live entries gone; S6: 8 (was 7),
              the true one listed.  Recording stops still not covered.
+
+
+NEED -- Passing a gate held open by the agent's own body (2026-11-09)
+--------------------------------------------------------------------
+Origin       intersect, solving advisor, SG3 dialogue, 2026-11-09.
+Need         Decide, and if necessary enforce, whether an agent may walk
+             through a gate whose open state depends on where the agent stands.
+             MOVE (tech/-mobility-action.lisp) judges a route's gates in the
+             departure state (gate-open-for-object reads (open gate)) and
+             propagates only after arrival, so a gate opened because the
+             agent's body blocks a beam (intersect: agent1 at location8 blocking
+             blue so red reaches receiver2 and gate2 opens) can be passed, and
+             closes behind the agent.  Plates differ: stepping off a plate is a
+             separate transition, so a gate held by the agent's weight is never
+             passed.  D: in the real game a gate closes as soon as its control
+             is lost (plate example); for beams D left the engine as is,
+             2026-11-09, because intersect's play appears to allow it.
+Proposed scope  Check other beam problems for plans that use this move; if the
+             game forbids it, a MOVE guard: reject a route through a gate that
+             is closed in the state recomputed with the agent removed from its
+             departure location.
+Dependencies tech/-mobility-action.lisp, tech/-passability.lisp, tech/-gate.lisp;
+             recorded solutions that would need re-validation (intersect SG2).
+Acceptance   D's ruling per beam problem; with a guard, intersect SG2's
+             location8 -> gate2 move is rejected and test-topo/test-talos
+             recordings are re-checked.
+Status       Open; to check for other problems later (D, 2026-11-09).

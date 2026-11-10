@@ -27,7 +27,7 @@
   gate (gate1 gate2 gate3 gate4)
   wall (wall1 wall2 wall3 wall4 wall5 wall6 wall7 wall8 wall9 wall10)
   window (window1 window2 window3 window4)
-  location (location1 location2 location3 location4 location5 location6 location7 location8)
+  location (location1 location2 location3 location4 location5 location6 location7 location8 location9)
   pressure-plate (plate1)
   connector (connector1 connector2 connector3)
   transmitter (transmitter1 transmitter2)
@@ -70,6 +70,7 @@
   (location-coords> location6 1 7)
   (location-coords> location7 3 4)
   (location-coords> location8 15 8)
+  (location-coords> location9 10 8)
 
   ;; Exact beam-fixture coordinates.  Each fixture faces one way, so the 1/10 offsets
   ;; place it on its facing side of the adjacent wall.

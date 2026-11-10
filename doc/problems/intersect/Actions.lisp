@@ -10,7 +10,19 @@
     (pickup-connector > agent1 picks up connector2 at location2)
     (select-termini > agent1 selects (receiver4 receiver2 transmitter2) for connector2 at location2)
     (put-connector > agent1 puts connector2 on ground at location2)
-    (move > agent1 moves via ((walk location2 (gate2) location3)))))
+    (move > agent1 moves via ((walk location2 (gate2) location3)))
+    ;; SG2 agent1 at location5 (west room) holding connector3; gate3 open, gate2 closed
+    (pickup-connector > agent1 picks up connector3 at location3)
+    (select-termini > agent1 selects (transmitter2) for connector3 at location3)
+    (put-connector > agent1 puts connector3 on ground at location3)
+    (move > agent1 moves via ((ladder location3 (ladder1) location2)))
+    (pickup-connector > agent1 picks up connector2 at location2)
+    (select-termini > agent1 selects (connector3 receiver2) for connector2 at location2)
+    (put-connector > agent1 puts connector2 on ground at location2)
+    (move > agent1 moves via ((walk location2 nil location8)))
+    (move > agent1 moves via ((walk location8 (gate2) location3)))
+    (pickup-connector > agent1 picks up connector3 at location3)
+    (move > agent1 moves via ((walk location3 (gate3) location5)))))
 
 (loop for form in *accepted-actions*
       for index from 1

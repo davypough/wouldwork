@@ -49,12 +49,15 @@ A checks these documents rather than asking D what they contain.
   its date, scope and reason in the affected problem's Handoff (or here for a
   method-wide seal), until D lifts it. There are currently no seals. Generated
   output is never hand-edited (M2).
-- D sets the maximum search depth from experiments and available time. Every
-  search this advisor runs uses `*threads*` 16 and `*solution-type*` MIN-LENGTH at that
-  maximum; use a lower cutoff only for a result shown reachable within it. Depth is the
-  only bound on these searches; a subgoal handed to the search advisor follows its rules.
-  Run diagnostic batteries only on D's request. Never deepen silently or recommend
-  above the maximum; ask D if more depth is needed.
+- A sets each subgoal search's depth cutoff (revised 2026-11-07): the leg's expected
+  length (D's hand count or A's) plus a margin, checked against the measured growth so
+  the run fits A's 15-minute limit. Record the cutoff and its reason in the Briefing's
+  subgoal log. Ask D only when the depth needed would take longer than that limit (a run
+  D makes on lumpy), or when a subgoal fails at A's cutoff and a deeper search would be
+  expensive. Every search this advisor runs uses `*threads*` 16 and `*solution-type*`
+  MIN-LENGTH at its cutoff. Depth is the only bound on these searches; a subgoal handed
+  to the search advisor follows its rules. Run diagnostic batteries only on D's request.
+  Never deepen silently: a changed cutoff is recorded with its reason.
 - Agree each subgoal with D before its realization. An approved stage plan, if
   supplied, authorizes its searches within the maximum without per-search approval.
   Otherwise agree subgoals in dialogue; no advance whole-plan approval is needed.
@@ -73,7 +76,7 @@ consequential rule or objective changes to the relevant analysis for D's agreeme
 change to the rules or the goal goes to the spec advisor), preserving prior evidence.
 
 From the search advisor's *Hand-off to the solving advisor* section, carry into the
-Briefing the spec (and any spec copy) its decisive runs used, the maximum depth, each
+Briefing the spec (and any spec copy) its decisive runs used, the depth it used, each
 decisive run (start, settings, cutoff, how it ended, growth per level, depth reached),
 the strategies tried and why each failed, the states shown dead, the necessary steps or
 hard preconditions observed, and the estimate that one search cannot finish. They are the starting
@@ -82,9 +85,8 @@ runs unless the spec has changed since. A record without that section (written b
 2026-10-15) gets a short summary of what its `search-analysis.txt` shows, confirmed
 with D.
 
-Gather only what is still missing: the problem-spec path, D's non-negative maximum
-search depth, and for a Talos problem the corresponding diagram path or an explicit
-"none". Check supplied files are accessible; ask about missing inputs rather than
+Gather only what is still missing: the problem-spec path, and for a Talos problem the
+corresponding diagram path or an explicit "none". Search depths are A's choice (Roles). Check supplied files are accessible; ask about missing inputs rather than
 guessing. Record them in `doc/problems/<problem>/Handoff.md`, preserving a resumed
 problem's current state. Do not silently change the spec.
 
@@ -295,13 +297,13 @@ in the subgoal's evidence.
    `Actions.lisp` as the subgoal's candidate and replay from the start. Hand-derived
    sequences must be validated. When a hand outline reaches the goal and each step is
    checked, D may validate it whole.
-2. **One plain search.** Otherwise one min-length search at D's maximum depth from
-   the accepted endpoint (*Search form*, below).
+2. **One plain search.** Otherwise one min-length search, at the cutoff A sets for the
+   subgoal, from the accepted endpoint (*Search form*, below).
 3. **The search advisor.** When the plain search exhausts or stalls, or the measured
    growth says it will, and the subgoal does not split at a natural precondition, hand
    it to the [search advisor](search-advisor.md) as a problem of its own:
    - It receives the same spec, the accepted endpoint as its start, the agreed subgoal
-     as its goal, D's maximum depth, and the plain search's result.
+     as its goal, the plain search's cutoff, and its result.
    - It records its work in the problem's `search-analysis.txt`, in a section headed
      `Subgoal SG<n>: <endpoint in a few words>`, numbered as in the Briefing's
      subgoal log.
@@ -314,7 +316,8 @@ in the subgoal's evidence.
    - It returns a path, or a bounded failure with the fields of its hand-off section.
    This advisor appends a returned path to `Actions.lisp` as the subgoal's candidate,
    replays it from the start, and reviews the endpoint. A bounded failure returns to
-   the dialogue: split the subgoal, choose another, or ask D about more depth.
+   the dialogue: split the subgoal, choose another, or search deeper (asking D when the
+   run would exceed A's limit).
 
 ### Starting a search from an endpoint
 
@@ -348,7 +351,7 @@ Source-checked 2026-10-15 (`src/ww-goal-chaining.lisp`, `ww-search-checkpoint.li
 
 Replace placeholders; retain the prior checkpoint until review:
 ```lisp
-(ww-set *depth-cutoff* <D's maximum>)
+(ww-set *depth-cutoff* <the subgoal's cutoff>)
 (ww-set *solution-type* min-length)
 (defparameter *checkpoint* (capture-search-checkpoint)) ; at the stated start
 (defparameter *candidate* (solve-subgoal *checkpoint* (<subgoal>)))
@@ -431,7 +434,7 @@ solves whole, which then never comes here.)
 - Talos problems only: `Constraint-Static-Profile.txt` (generated; never
   hand-edited, M2) and the diagram, if supplied.
 
-Briefing.md: maximum depth (and, for Talos, the profile path and hash), then
+Briefing.md: the profile path and hash (Talos), then
 **Spec-diagram check** (Talos only), **Summary**, **Difficulties** (including the
 evidence carried from the search hand-off), **Contracts** (including UNCOVERED
 mechanics), **Hints** (qualified, with sources),
@@ -508,7 +511,7 @@ Handoff.md template:
 Updated <date>.  Status: <phase, stage>.
 Problem spec: <file path>.
 Corresponding diagram (Talos only): <file path or "none">.
-Maximum search depth: <D's cutoff>, set <date>.
+Search depth: <current subgoal cutoff and its reason>, set <date>.
 ## Next step       one line: who does what
 ## State           accepted actions in Actions.lisp; current endpoint in domain terms
 ## Checkpoints     file | phases/actions | SHA-256 | what it is
