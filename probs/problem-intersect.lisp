@@ -4,6 +4,9 @@
 ;;; passed in the forced order G1 -> G2 -> G3 -> G4; crossing beams cut each other.
 ;;; Analysis: doc/problems/intersect/problem-analysis.txt (rev 4).
 ;;; Spec record: doc/problems/intersect/spec-analysis.txt.
+;;; Revision 4 (2026-11-10): location10 and location11 added (blue route to receiver3 through
+;;; window4, outside the central room); location4 and location5 removed, since 11 locations
+;;; exceed the engine's 999-object limit (crossing records) and neither is needed.
 
 
 (in-package :ww)
@@ -27,7 +30,8 @@
   gate (gate1 gate2 gate3 gate4)
   wall (wall1 wall2 wall3 wall4 wall5 wall6 wall7 wall8 wall9 wall10)
   window (window1 window2 window3 window4)
-  location (location1 location2 location3 location4 location5 location6 location7 location8 location9)
+  location (location1 location2 location3 location6 location7 location8 location9
+            location10 location11)
   pressure-plate (plate1)
   connector (connector1 connector2 connector3)
   transmitter (transmitter1 transmitter2)
@@ -65,12 +69,12 @@
   (location-coords> location1 15 5)
   (location-coords> location2 21 6)
   (location-coords> location3 24 8)
-  (location-coords> location4 15 16)
-  (location-coords> location5 4 8)
   (location-coords> location6 1 7)
   (location-coords> location7 3 4)
   (location-coords> location8 15 8)
   (location-coords> location9 10 8)
+  (location-coords> location10 8 1)    ;lower room, south of wall2: sees transmitter1, receiver1, location11
+  (location-coords> location11 2 15)   ;west room: sees location10 through window4, and receiver3
 
   ;; Exact beam-fixture coordinates.  Each fixture faces one way, so the 1/10 offsets
   ;; place it on its facing side of the adjacent wall.

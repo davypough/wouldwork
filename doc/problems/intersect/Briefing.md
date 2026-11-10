@@ -3,10 +3,13 @@
 Started 2026-11-07.  Spec: `probs/problem-intersect.lisp` (revision 3, location9 added
 2026-11-08; revision 2 added location8).
 Diagram: `doc/problems/intersect/intersect-diagram.png`.
-Static profile: `doc/problems/intersect/Constraint-Static-Profile.txt`, generated
-2026-11-07 on the corrected engine (see *Engine corrections*), SHA-256
-`edb0fbaea1d96429415ecaefe967a886366a7c28fa2b48ab69c4a8c06530e8f5`.  8 of 8 technologies
-covered, 0 UNCOVERED.  Stale since revision 3 (location9); regenerate before relying on it.
+Static profile: generated 2026-11-07 for revision 1 (8 of 8 technologies covered, 0
+UNCOVERED); stale from revision 3 and removed at wrap-up.  Regenerate if needed.
+
+Wrap-up (2026-11-10, D's request): only the final problem and solution are kept.  Removed:
+the probe copy `probs/problem-intersect-1.lisp`, the pre-spec analysis snapshot, the Python
+beam-dynamics sketch and the stale static profile (all in git history).  Their findings and
+lessons remain below.
 
 ## Spec-diagram check
 
@@ -71,7 +74,8 @@ None needed (0 UNCOVERED).
 |---|---|---|---|---|
 | SG1 agent1 at location3 | D's milestone (L3 by ~9) | replay from start | one plain search | 8 steps, accepted 2026-11-07 |
 | SG2 agent1 at location5 | D's milestone (L5 by ~23) | replay from start | one plain search | 11 steps, accepted 2026-11-08 |
-| SG3 exit to location3 with relay at location9 | A's backward reading, agreed by D | search from SG2 endpoint | one plain search | none within 14 (lumpy, 2026-11-08; again on probe copy intersect-1, 2026-11-09) |
+| SG3 agent1 at location7 (goal) | A's reanalysis: blue via location10 and location11 | replay from start | hand plan, replayed | 21 steps, goal reached 2026-11-10 |
+| (old) SG3 exit to location3 with relay at location9 | A's backward reading, agreed by D | search from SG2 endpoint | one plain search | none within 14 (lumpy, 2026-11-08; again on probe copy intersect-1, 2026-11-09) |
 
 **SG1.**  Search: state start, `(solve-subgoal *start-state* (has-location agent1 location3))`,
 cutoff 10, min-length, threads 16, lower-bound pruning off; 0.8 s, 3,521 states, one
@@ -153,7 +157,7 @@ connector2 red, crossing227 active (its beam to receiver2 x blue at (15, 6.84)),
 receiver2 and receiver3 both dark, gates 2 and 3 closed, before and after agent1 stands
 at location8.  CONTRADICTED (measured).
 
-Probe copy `probs/problem-intersect-1.lisp` (2026-11-09, D's suggestion): location8 moved
+Probe copy `probs/problem-intersect-1.lisp` (2026-11-09, D's suggestion; file since removed): location8 moved
 from (15, 8) to (15, 25/4), on blue's line just north of gate1 (y = 13/2 would put the body
 within the 1/2 occlusion tolerance of the location9 -> receiver2 beam).  R4 replay (A,
 cloud): SG1 + SG2 replay success T on the copy; then connector3 left at location5,
@@ -219,6 +223,35 @@ gate held open only by its own body in a beam (SG2's location8 -> gate2 move); p
 already strict.  D keeps the engine as is for intersect; check other problems later
 (Schema-Gaps.txt, NEED of 2026-11-09).
 
+**Reanalysis (2026-11-10).**  Fresh premise review found P2 false: receiver3 is not lit
+only up x = 15.  The lower room includes the strip west of wall2 and the cell between
+window3 and window4 (no wall along y = 6, x 5-8).  A connector in the lower room south of
+wall2 sees transmitter1 and receiver1 and, through window4, a west-room spot that sees
+receiver3; blue then never enters the central room, so red there no longer competes with
+it.  Confirmed by D in the game (2026-11-10).  Why missed: "transmitter1 is seen only from
+location1" (true of locations 1-9) was promoted to "blue reaches receiver3 only up x = 15"
+(read, never measured); the P3 sweep covered only the red side in the central room; the
+cell had no location, so search and profile could not see it.  Lesson: an "only from / only
+via" premise needs a sweep of every walkable area before an impossibility rests on it.
+Spec revision 4 (D approved): location10 (8, 1) and location11 (2, 15), best integer pair
+by a geometry script (tightest wall-corner clearance 0.79, location10 -> location11 past
+window4's edge).  With 11 locations staging fails ("Design Limit Error: Total number of
+planning objects exceeds 999", crossing records), so location4 and location5 were removed
+(A's change, to be confirmed by D); SG2 now ends at location11.
+
+**SG3 (2026-11-10).**  A's candidate ending, replayed from the start (cloud SBCL 2.2.9,
+`validate-action-sequence`, revision 4): 40 actions, success T, goal satisfied.
+- connector3 put at location11 paired with receiver3; agent1 back east through gate3 and
+  up the ladder.
+- connector2 re-paired with transmitter2 and receiver2 at location9 (gate1 stays open).
+- connector1 moved to location10, paired with transmitter1, receiver1, connector3: blue
+  runs location10 -> location11 -> receiver3; gates 1, 2 and 3 all open, no crossings.
+- agent1 walks lower room -> central -> east -> west, picks up connector3 and puts it on
+  plate1 paired with connector2 and receiver4: red location9 -> location6, gate4 opens.
+Not shown shortest (no search run).  The put on a plate is `on plate1`, not `on ground`.
+
 ## Result
 
-Not reached.
+Reached 2026-11-10: 40 actions (SG1 8 + SG2 11 + SG3 21) in `Actions.lisp`, replay success
+T, goal satisfied (cloud; confirmed by D's local validation, 2026-11-10).  A valid plan;
+minimal length not established.  Not yet played in the game by D.

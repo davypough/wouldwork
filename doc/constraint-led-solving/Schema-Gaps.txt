@@ -244,3 +244,25 @@ Acceptance   D's ruling per beam problem; with a guard, intersect SG2's
              location8 -> gate2 move is rejected and test-topo/test-talos
              recordings are re-checked.
 Status       Open; to check for other problems later (D, 2026-11-09).
+
+
+NEED -- More than 999 planning objects (2026-11-10)
+--------------------------------------------------
+Origin       intersect, solving advisor, spec revision 4, 2026-11-10.
+Need         A coordinate-driven Talos spec registers one object per potential
+             beam crossing.  intersect with 11 locations exceeded the limit at
+             staging (REGISTER-DYNAMIC-OBJECT, src/ww-converter.lisp: "Design
+             Limit Error: Total number of planning objects exceeds 999"; the
+             failing record was crossing753).  Adding two locations therefore
+             forced removing two others (location4, location5).  Crossing
+             records grow roughly with the square of the beam endpoints, so
+             larger levels, and R7 test-point sweeps on a spec copy, will meet
+             the limit again.
+Proposed scope  Either raise the object-index limit (the integer encoding of
+             propositions allots three digits per object), or register a
+             crossing record only when both beams are potentially visible.
+Dependencies src/ww-converter.lisp (object indices, convert-to-integer);
+             tech/-beam-los-coordinates.lisp (crossing record derivation).
+Acceptance   intersect stages with all 11 locations and the accepted 40
+             actions still replay to the goal; test-topo and test-talos pass.
+Status       Open; not approved for implementation.

@@ -12,7 +12,7 @@ PROBLEM / REVISION / AUTHORIZED SCOPE
 
 INPUT ANALYSIS AND OBJECTIVE
   doc/problems/intersect/problem-analysis.txt, revision 4 (2026-11-07; L8 added).
-  Preserved snapshot: problem-analysis-2026-11-04-before-spec.txt (rev 2; until wrap-up).
+  Preserved snapshot: problem-analysis-2026-11-04-before-spec.txt (rev 2; removed at wrap-up 2026-11-10, in git history).
   Rev 3 corrections (user): L2 -> (21,6); L8 removed; LD1 climbs L3 -> L2.  Agreed.
 
 REPRESENTATION AND AUTHORING APPROACH
@@ -222,3 +222,13 @@ CORRECTIONS AND HISTORY
      made in the solving-advisor session.  Edit: location9 in the location type;
      (location-coords> location9 10 8).  Staging, walking/visibility review and the static
      profile regeneration: pending.
+  16. Revision 4: location10 (L10) at (8,1) and location11 (L11) at (2,15) added; location4
+     and location5 removed (solving-advisor reanalysis, user-approved 2026-11-10; problem
+     analysis rev 6).  Edit: the location type; two (location-coords> ...) facts added, two
+     removed.  With all 11 locations staging fails: "Design Limit Error: Total number of
+     planning objects exceeds 999" (crossing records; cloud SBCL 2.2.9).  With 9 locations
+     it stages; the 40 accepted actions replay from the start with success T and goal
+     satisfied (cloud, assistant-run; confirmed by the user on Windows, 2026-11-10).  The
+     static profile is stale (generated before revision 3); not regenerated.  Wrap-up (user,
+     2026-11-10): the probe copy problem-intersect-1.lisp and the stale static profile were
+     removed; only the final spec is kept.

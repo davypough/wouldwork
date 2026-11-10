@@ -258,7 +258,7 @@ each check with its verdict in the Briefing, next to the claim it tests.
 | R2 | **Support tree** | Listing the ways a step can happen, and any claim that some fact can never become true | For every fact the condition needs, derived ones included (a gate open, a device active), trace in the tech or spec every effect that asserts it, including indirect ones (propagation, settling, cascades, effects of other actors), and follow each derived fact down to the base facts it rests on (a device active rests on its source's place, height and links; a place can come from being carried).  Write the tree down before listing options | Shows which mechanisms exist, not whether their preconditions can be reached in play.  Applied to the wrong fact it misses cases: check the fact the step needs, not a neighbouring one |
 | R3 | **Every actor present** | A search is used to show that something cannot be done | The start state must include every actor, object and phase that could supply the capability; otherwise the result holds only for that narrower setting.  Say which were left out | A completed search is still a bound relative to its start and cutoff |
 | R4 | **Short mechanism replay** | An argument relies on, or excludes, one mechanic | Replay one to three actions from a hand-built state (`make-start-state-from-facts`, `validate-action-sequence`) and read the resulting facts | Proves the mechanic from that state, not that the state is reachable |
-| R5 | **Premise ledger** | A counting, budget or impossibility argument | List every premise, each marked read (with its source) or measured.  When a solution is known or expected, an impossible result means a premise is wrong: test the least certain one first with R2 to R4 | The ledger finds no premise by itself; it orders the checks |
+| R5 | **Premise ledger** | A counting, budget or impossibility argument | List every premise, each marked read (with its source) or measured.  When a solution is known or expected, an impossible result means a premise is wrong: test the least certain one first with R2 to R4.  A premise of the form "only from" or "only via" that was read off the listed locations counts as unmeasured until an R7 sweep has covered every walkable area, not just the room under study | The ledger finds no premise by itself; it orders the checks |
 | R6 | **Probe the eliminated option** | An option was ruled out by reasoning | Start from the state most favourable to that option and search for the fact it would need | Bounded by the cutoff; a success refutes the elimination, a failure only supports it |
 | R7 | **Test-point sweep** | A claim that no place, position or value works | On a spec copy, add test points (locations, coordinates, parameter values) and query the relevant relation for each | The original spec is never changed; a copy needs its own problem name and file header |
 | R8 | **Role overlap** | A counting, budget or allocation argument that assigns objects to roles | For every pair of roles, ask whether one object can fill both at once (cargo and carrier, load and relay, keeper and relay), and check each yes against the rules (R2, R4).  Also ask whether one object fills roles one after another: in a recorder problem a copy can change jobs during the recording, so count jobs over time, not one job per copy | Counting arguments silently assume disjoint roles; an overlap can remove the shortage |
@@ -624,6 +624,16 @@ and edges included; NIL means an empty clause. Plain MOVE is accepted. Actions
 with multiple outcomes need their printed phrase to select the outcome, e.g.
 `(jam-target > agent1 jams gate5 with jammer1 at location8 on ground)`.
 Validation accepts mixed plain and timestamped action lists.
+
+Example (intersect, 2026-11-10).  Every route to the goal had been ruled out by reading,
+replay, bounded search and a geometry sweep.  The impossibility rested on "blue reaches
+receiver3 only up the x = 15 line", read from "transmitter1 is seen only from location1",
+which was true only of the listed locations.  The sweep (R7) had covered the red side in the
+central room alone.  The lower room's west cell, recorded in the problem analysis but given
+no location, lets a connector see transmitter1, receiver1 and, through window4, a west-room
+spot that sees receiver3; with blue routed there the plan was written by hand and validated
+on its first complete replay.  A fresh ledger (R5) found it by asking, for each "only"
+premise, which areas had never been swept.
 
 #### Constructing hand-written action sequences
 

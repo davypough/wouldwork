@@ -1,11 +1,12 @@
 PROBLEM / REVISION / SOURCES / AUTHORIZED SCOPE
-  Problem: intersect (diagram title INTERSECTIONS).  Revision 5, 2026-11-08 (rev 4 2026-11-07; rev 3 2026-11-05; rev 2 consolidated 2026-11-04).
+  Problem: intersect (diagram title INTERSECTIONS).  Revision 6, 2026-11-10 (rev 5 2026-11-08; rev 4 2026-11-07; rev 3 2026-11-05; rev 2 consolidated 2026-11-04).
   Sources: doc/problems/intersect/intersect-diagram.png; symbol key from
   doc/problems/rumin-topo/diagram.png; user clarifications in dialogue 2026-11-04
   (apparatus offsets, starts, controls, goal, ladder LD1 added in dialogue);
   user corrections 2026-11-05 (L2 relocated, L8 removed, LD1 retargeted to L2);
   user addition 2026-11-07 (new L8 at (15,8), diagram updated);
-  user addition 2026-11-08 (new L9 at (10,8), central room).
+  user addition 2026-11-08 (new L9 at (10,8), central room);
+  solving-advisor reanalysis 2026-11-10 (new L10 at (8,1), L11 at (2,15); L4, L5 removed).
   Record: doc/problems/intersect/problem-analysis.txt.
   Scope: problem-advisor analysis only.  No spec, measurement, or search authorized.
 
@@ -19,10 +20,10 @@ AGREED PROBLEM DESCRIPTION  (agreed by user 2026-11-04)
   Gates: G1 y=6 x14-17; G2 x=23 y0-4; G3 x=18 y15-20; G4 y=6 x0-5.
   Ladder: LD1 positioned at L3; one-way climb L3 -> L2; empty-handed only.
   Areas (joined only by gates and LD1):
-    lower room    x5-17 y0-6 plus cell x5-8 y6-10:          L1(15,5), T1b, R1b
-    central room  x8-23 y6-10, x5-23 y10-15, x17-23 y0-6:    L2(21,6), L8(15,8), T2r, R2r
+    lower room    x5-17 y0-6 plus cell x5-8 y6-10:          L1(15,5), L10(8,1), T1b, R1b
+    central room  x8-23 y6-10, x5-23 y10-15, x17-23 y0-6:    L2(21,6), L8(15,8), L9(10,8), T2r, R2r
     east corridor x23-29 y0-20 and y15-20 x18-23:            L3(24,8), LD1
-    west/north corridor x0-5 y6-20 and y15-20 x0-18:         L4(15,16), L5(4,8), L6(1,7)+P1,
+    west/north corridor x0-5 y6-20 and y15-20 x0-18:         L11(2,15), L6(1,7)+P1,
                                                              R3b, R4r
     SW room       x0-5 y0-6:                                 L7(3,4)
     G1 lower<->central; G2 central<->east; G3 east<->west/north; G4 west/north<->SW;
@@ -69,7 +70,7 @@ STRUCTURE AND GROWTH
   from east to central.  Every plan therefore passes G1, G2, G3, G4 in that order, each
   open at its time of passage.  C2 (at L2) is unreachable before G1 is first opened; C3 (at L3)
   before G2 is first opened.
-  Size: 1 agent, 3 connectors, 8 locations, 6 apparatus, 4 gates, 1 plate, 1 ladder.
+  Size: 1 agent, 3 connectors, 9 locations, 6 apparatus, 4 gates, 1 plate, 1 ladder.
   History irrelevant to future legality: state fully determines continuations.
   Growth: connect branching = reachable locations x link subsets (92 for 8 termini, cap 3);
   subsets grow ~cubically in termini; locations, gates grow linearly.
@@ -86,8 +87,9 @@ JUSTIFIED DESIGN  (all agreed by user 2026-11-04)
      would require solving.  Reconsider: search advisor may test omission as a speed-up.
      put-connector needed (cheapest way to hold P1 with an unlinked connector).
   D4 *max-connector-pairings* 3 (user: probably needed; one input + two outputs).
-  D5 Locations L1-L9 as given (L8 added by user 2026-11-07 for the third subgoal leg;
+  D5 Locations L1-L3, L6-L11 as given (L8 added by user 2026-11-07 for the third subgoal leg;
      L9 added 2026-11-08 for the red feed to the west room).
+     L10, L11 added and L4, L5 removed 2026-11-10 (rev 6).
      Reconsider if a needed beam line has no location.
   D6 Coordinate-derived geometry (walls, windows, gates, fixtures, locations), as in
      rumin-topo; required for exact crossings.
@@ -144,7 +146,8 @@ HINTS FOR DOWNSTREAM ADVISORS
 AGREEMENT AND HANDOFF
   User confirmed description and design D1-D8, 2026-11-04.
   Status: Analysis complete and ready for the spec advisor.
-  Snapshot: problem-analysis-2026-11-04-before-spec.txt.
+  Snapshot: problem-analysis-2026-11-04-before-spec.txt (removed at wrap-up 2026-11-10;
+  in git history).
   Next step (not yet authorized): spec-advisor consultation to write problem-intersect.lisp.
 
 CORRECTIONS
@@ -167,3 +170,11 @@ CORRECTIONS
     From L9 a connector sees T2r and, through WIN3 and WIN4, L6 and R4r, without crossing
     x=15.  The user confirms a connector can be placed there in the level.  Area membership
     and the forced gate order are unchanged.  Locations now L1-L9.
+  - Rev 6 (solving advisor, user-approved 2026-11-10): new L10 at (8,1) in the lower room,
+    in the opening south of w2, and new L11 at (2,15) in the west/north corridor.  A
+    connector at L10 sees T1b and R1b and, through WIN4, L11; L11 sees R3b.  Blue then
+    reaches R3b without entering the central room, so red there no longer competes with it
+    (the user confirmed the sight lines in the level).  L4 and L5 removed: with 11 locations
+    the crossing records exceed the engine's 999-object limit, and no plan step needs them.
+    Area membership and the forced gate order are unchanged.  Locations now L1-L3, L6-L11.
+    A 40-action plan replays to the goal (Briefing, SG3 2026-11-10).
