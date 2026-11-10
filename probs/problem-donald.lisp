@@ -6,17 +6,24 @@
 ;;;          +GERALD
 ;;;         = ROBERT
 
-;;; Variant of problem-donald.lisp (search-advisor run, 2026-10-03):
-;;; - csp: the columns are assigned in a fixed order, one per depth, so the
-;;;   6! orderings of the same assignment are no longer explored separately.
-;;; - The columns are defined right to left (units column first), so each carry
-;;;   is fixed by the column that produces it before the next column uses it.
-;;; - Forward checking: assigning a letter removes its digit from every other
-;;;   letter's remaining list, so each action draws only unused digits and the
-;;;   all-different test against earlier assignments is no longer needed.
-;;; - The goal tests the whole sum.  Forward checking can fix the last letter by
-;;;   elimination, so "every letter has one digit" no longer means "every column
-;;;   has been checked".
+;;; Design notes:
+;;; - csp: the columns are assigned in a fixed order, one per step, so the 6! orderings of
+;;;   the same assignment are not explored separately.
+;;; - The columns are defined right to left (units column first), so each carry is fixed by
+;;;   the column that produces it before the next column uses it.
+;;; - Forward checking: assigning a letter removes its digit from every other letter's
+;;;   remaining list, so each action draws only unused digits.
+;;; - Arc consistency after every column.  Every remaining column sum keeps only the digits
+;;;   and carries that still have some way to add up, and a letter left with a single digit
+;;;   takes that digit from all the others, repeated until nothing changes.  If some letter
+;;;   or carry is left with no possible value, the column choice is dropped before it
+;;;   becomes a state.  Only values no completion could use are removed, so no solution is
+;;;   lost.  The narrowing is done by the engine library (src/ww-arc-consistency.lisp); the
+;;;   spec only states the column sums and the rule that letters differ.
+;;; - Measured 2026-10-15, every solution: 4 program cycles with arc consistency, against
+;;;   424 with forward checking alone (doc/problems/donald/search-analysis.txt).
+;;; - The goal tests the whole sum.  Narrowing can fix a letter by elimination, so "every
+;;;   letter has one digit" does not mean "every column has been checked".
 
 
 (in-package :ww)  ;required
@@ -41,6 +48,70 @@
   (remaining variable $list))
 
 
+;------------------ arc consistency network ---------------------
+
+
+(defparameter *ac-variables* '(D O N A L G E R B T c0 c1 c2 c3 c4 c5 c6)
+  "The variables in network order: a variable's number is its position here.")
+
+
+(defparameter *ac-letter-numbers* (loop for n below 10 collect n)
+  "The numbers of the letters among *ac-variables*.")
+
+
+(defun ac-numbers (&rest variables)
+  (mapcar (lambda (var) (position var *ac-variables*)) variables))
+
+
+(defun narrow-all-different (domains)
+  ;A letter left with one digit removes it from every other letter, repeated until no new
+  ;letter is fixed.  :empty if some letter loses its last digit.
+  (let ((changed nil)
+        (done nil))
+    (loop for fixed = (find-if (lambda (n)
+                                 (and (not (member n done))
+                                      (alexandria:length= 1 (svref domains n))))
+                               *ac-letter-numbers*)
+          while fixed
+          do (push fixed done)
+             (let ((digit (first (svref domains fixed))))
+               (dolist (n *ac-letter-numbers*)
+                 (when (and (/= n fixed) (member digit (svref domains n)))
+                   (setf (svref domains n) (remove digit (svref domains n)))
+                   (when (null (svref domains n))
+                     (return-from narrow-all-different :empty))
+                   (pushnew n changed)))))
+    changed))
+
+
+(defparameter *ac-network*
+  (make-constraint-network
+    (length *ac-variables*)
+    (list (make-support-constraint (ac-numbers 'c6 'D 'T 'c5)
+                                   (lambda (c6 d tt c5)
+                                     (and (/= d tt) (= (+ c6 d d) (+ tt (* 10 c5))))))
+          (make-support-constraint (ac-numbers 'c5 'L 'R 'c4)
+                                   (lambda (c5 l r c4)
+                                     (and (/= l r) (= (+ c5 l l) (+ r (* 10 c4))))))
+          (make-support-constraint (ac-numbers 'c4 'A 'E 'c3)
+                                   (lambda (c4 a e c3)
+                                     (and (/= a e) (= (+ c4 a a) (+ e (* 10 c3))))))
+          (make-support-constraint (ac-numbers 'c3 'N 'R 'B 'c2)
+                                   (lambda (c3 n r b c2)
+                                     (and (/= n r b) (= (+ c3 n r) (+ b (* 10 c2))))))
+          (make-support-constraint (ac-numbers 'c2 'O 'E 'c1)
+                                   (lambda (c2 o e c1)
+                                     (and (/= o e) (= (+ c2 o e) (+ o (* 10 c1))))))
+          (make-support-constraint (ac-numbers 'c1 'D 'G 'R 'c0)
+                                   (lambda (c1 d g r c0)
+                                     (and (/= d g r) (= (+ c1 d g) (+ r (* 10 c0))))))
+          (make-narrowing-constraint *ac-letter-numbers* #'narrow-all-different)))
+  "The column sums (each column's letters differ) and the all-different rule.")
+
+
+;------------------------ queries and updates ----------------------
+
+
 (define-query get-remaining (?var)
   (do (bind (remaining ?var $digits))
       $digits))
@@ -61,6 +132,22 @@
           (remaining ?l (remove ?digit $digits))))))
 
 
+(define-update arc-consistency! ()
+  ;Narrows every remaining list to a fixpoint; drops the state if some list becomes empty.
+  (do (setf $domains (make-array (length *ac-variables*)))
+      (ww-loop for $var in *ac-variables*
+               for $n from 0
+        do (setf (svref $domains $n) (get-remaining $var)))
+      (if (propagate-network *ac-network* $domains :all)
+        (ww-loop for $var in *ac-variables*
+                 for $n from 0
+          do (remaining $var (svref $domains $n)))
+        (inconsistent-state))))
+
+
+;------------------------ actions ----------------------------
+
+
 (define-action assign-column-6
     1
   (product ?D (get-remaining D) ?T (get-remaining T) ?c5 (get-remaining c5) ?c6 (get-remaining c6))
@@ -69,7 +156,8 @@
   (?D ?D ?T)
   (assert (assign-letter D ?D)
           (assign-letter T ?T)
-          (remaining c5 (list ?c5))))
+          (remaining c5 (list ?c5))
+          (arc-consistency!)))
 
 
 (define-action assign-column-5
@@ -80,7 +168,8 @@
   (?L ?L ?R)
   (assert (assign-letter L ?L)
           (assign-letter R ?R)
-          (remaining c4 (list ?c4))))
+          (remaining c4 (list ?c4))
+          (arc-consistency!)))
 
 
 (define-action assign-column-4
@@ -91,7 +180,8 @@
   (?A ?A ?E)
   (assert (assign-letter A ?A)
           (assign-letter E ?E)
-          (remaining c3 (list ?c3))))
+          (remaining c3 (list ?c3))
+          (arc-consistency!)))
 
 
 (define-action assign-column-3
@@ -102,7 +192,8 @@
   (?N ?R ?B)
   (assert (assign-letter N ?N)
           (assign-letter B ?B)
-          (remaining c2 (list ?c2))))
+          (remaining c2 (list ?c2))
+          (arc-consistency!)))
 
 
 (define-action assign-column-2
@@ -112,7 +203,8 @@
        (= (+ ?c2 ?O ?E) (+ ?O (* 10 ?c1))))
   (?O ?E ?O)
   (assert (assign-letter O ?O)
-          (remaining c1 (list ?c1))))
+          (remaining c1 (list ?c1))
+          (arc-consistency!)))
 
 
 (define-action assign-column-1
@@ -121,7 +213,8 @@
   (and (/= ?D ?G ?R)
        (= (+ ?c1 ?D ?G) (+ ?R (* 10 ?c0))))
   (?D ?G ?R)
-  (assert (assign-letter G ?G)))
+  (assert (assign-letter G ?G)
+          (arc-consistency!)))
 
 
 (define-init

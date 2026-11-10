@@ -30,3 +30,8 @@ Same single solution: 526485 + 197485 = 723970.  After the first column (D=5, T=
 propagation fixes every letter and carry, so the goal holds at depth 1 (the Python check
 counted 10 states because it still walked the remaining columns).  Times are too small to
 compare; the lesson is structural: column sums with carries propagate strongly.
+
+2026-11-10  Consolidation
+-------------------------
+problem-donald-1.lisp (arc consistency) replaced problem-donald.lisp under the name donald;
+the forward-checking-only spec was retired.  The donald-1 runs above are now donald.

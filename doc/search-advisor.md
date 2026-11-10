@@ -422,7 +422,7 @@ S14 = C5, S15 = B17.
 | B12 | **Ordered list of open variables** | Assignment with one action over every variable (a crossword's slots) | the action takes its variable from an ordered list of the open ones held in the state, most constrained first (section 3.1, note 1) | Each state is reached by one path, so use tree search |
 | B13 | **Forward checking** | Assignments where earlier values narrow later domains | `define-update` narrowing the remaining domains as values are assigned (`problem-captjohn.lisp`) | The goal must test the constraints themselves (note 1) |
 | B14 | **Completion check** | The search sets only some variables and leaves the rest for a later fill | a completion solver run on every placement (section 3.1, note 3) | Its own cost per placement; may need parallel tuning (section 4) |
-| B15 | **Arc consistency** | Assignments whose constraints link several variables (column sums, crossings), so one assignment leaves values no completion can use | the spec states its variables, domains and constraints to `src/ww-arc-consistency.lisp` and calls `propagate-network` from a `define-update` after each assignment, asserting `(inconsistent-state)` when it fails (`problem-donald-1.lisp`; note 15) | Sound by construction.  Pays where it decides the problem or inside an exact check (B14's solver uses it); as a partial check under a best-value search it did worse than no check (note 15) |
+| B15 | **Arc consistency** | Assignments whose constraints link several variables (column sums, crossings), so one assignment leaves values no completion can use | the spec states its variables, domains and constraints to `src/ww-arc-consistency.lisp` and calls `propagate-network` from a `define-update` after each assignment, asserting `(inconsistent-state)` when it fails (`problem-donald.lisp`; note 15) | Sound by construction.  Pays where it decides the problem or inside an exact check (B14's solver uses it); as a partial check under a best-value search it did worse than no check (note 15) |
 | B16 | **Representation changes** | Q18, or a probe showing wasted states | a re-encoded spec copy (section 1.1) | The copy's reachable states and goals must correspond to the original's within the tested scope |
 | B17 | **Action-set reduction** | One action's job can be done by others at no extra length, and that action adds many successors | A spec copy without the action, or with a narrower precondition, plus a written replacement argument (note 9) | Changes the rules: with the argument it is a re-encoding (section 1.1), without it a specification topic for the spec advisor.  Without the argument the reduced model still finds valid plans, but proves no minimum and no absence |
 | B18 | **Macro actions** | Q15 shows recurring multi-move patterns | combined actions before the base actions; candidates from `(freq 2 3)` (D5) | Each added action costs work at every state; keep the base actions; a saving can reverse with size (note 5) |
@@ -460,10 +460,10 @@ same approaches with their entry points.
    carry chain runs from the units column), with the most constraining variables first.
    `*algorithm*` backtracking (REPL) is optional; depth-first also respects the order.  Narrow
    the remaining domains as values are assigned (forward checking; `define-update` as in
-   `problem-captjohn.lisp`).  Order matters: donald-1 right to left took 424 program cycles to
-   prove, left to right 1,440.  With forward checking a variable can be fixed by elimination,
+   `problem-captjohn.lisp`).  Order matters: donald with forward checking alone took 424
+   program cycles to prove right to left, 1,440 left to right.  With forward checking a variable can be fixed by elimination,
    so the goal must test the constraints themselves, not only that every variable has one
-   value: donald-1's first draft, whose goal tested only that, reported 30 false solutions one
+   value: an early donald draft, whose goal tested only that, reported 30 false solutions one
    column early.
 2. **Optimization.**  When moves can be undone, `min-length` without a `*depth-cutoff*` first
    dives along a very long path and then shortens it a move or two at a time (hanoi, 7 disks: a
@@ -806,7 +806,7 @@ magnitude.  Report the regimes the user might want with their costs, measured wh
 
 The ratio of prove to find is itself a measurement: near 1 means solutions are scarce or
 found late, so a heuristic will not help; a large ratio means a `first` search is cheap but a
-proof is not.  Cryptarithms, measured with the donald-1 scheme: DONALD 225 to find and 424 to
+proof is not.  Cryptarithms, measured with donald's forward checking alone: DONALD 225 to find and 424 to
 prove (1.9 times); a 41-addend puzzle 5,161 and 111,116 (21 times); random base-16 puzzles of
 two 8-letter addends 6,253 and 1,302,741 (about 200 times). When the gap is small and the
 objective benefits from exhaustive evidence, propose that additional work within its budget.
@@ -1204,7 +1204,7 @@ squares holding a single empty cell multiplied the distinct states within 22 mov
 board shortened the solution and made the search cheaper.  Count what can move, not how much
 room there is.
 
-Cryptarithms with the donald-1 scheme (csp, columns right to left, forward checking), median
+Cryptarithms with donald's forward checking alone (csp, columns right to left), median
 program cycles to prove: word length 6, 10, 14 (base 10, two addends): 1,556, 1,304, 750; more
 columns add constraints, so length is harmless.  Addends 2, 3, 4, 6 (length 6): 1,556,
 2,070, 6,757, 16,044; per-expansion work grows too (Q6).  Base 10, 12, 14, 16 (length 8):
