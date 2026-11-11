@@ -146,7 +146,6 @@ AGREEMENT AND HANDOFF
   probes and position counting. Excluded: finding the game value without a proposed strategy.
   Spec obligations: faithful rules model (R1) plus a strategy-check variant (R2) whose fixed
   rule is deterministic and total; settings for n, color, first mover; replayable paths.
-  Snapshot: doc/problems/fox-geese/problem-analysis-2026-10-18-before-spec.txt
   Next step (needs authorization): spec advisor consultation.
 
 DIALOGUE EVALUATION

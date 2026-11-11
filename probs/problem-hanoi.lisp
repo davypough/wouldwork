@@ -2,6 +2,8 @@
 
 ;;; Problem specification for the tower of hanoi.
 ;;; Each disk records the peg it is on; the order of disks on a peg follows from size.
+;;; The number of disks is a setting: change *disks*, set *depth-cutoff* to match,
+;;; and restage.
 
 
 (in-package :ww)  ;required
@@ -12,12 +14,20 @@
 
 (ww-set *solution-type* min-length)
 
-(ww-set *depth-cutoff* 7)  ;the known optimum, 2^n - 1 moves for n disks on 3 pegs
+(ww-set *depth-cutoff* 7)  ;the known optimum, 2^n - 1 moves for n disks; change with *disks*
+
+
+(defparameter *disks* 3)  ;number of disks
+
+
+(defparameter *disk-names* (loop for size from 1 to *disks*
+                                 collect (intern (format nil "DISK~D" size)))
+  "The disks from smallest to largest.")
 
 
 (define-types
   peg   (peg1 peg2 peg3)
-  disk  (disk1 disk2 disk3))  ;disk1 is the smallest
+  disk  (compute *disk-names*))  ;disk1 is the smallest
 
 
 (define-dynamic-relations
@@ -41,18 +51,21 @@
   (assert (loc ?disk ?peg2)))
 
 
-(define-init
-  ;dynamic
-  (loc disk3 peg1)
-  (loc disk2 peg1)
-  (loc disk1 peg1)
-  ;static
-  (smaller> disk1 disk2)
-  (smaller> disk1 disk3)
-  (smaller> disk2 disk3))
+;;; Every disk starts on peg1.
+(define-init-action initialize-disks 0
+  (?disk disk)
+  (always-true)
+  ()
+  (assert (loc ?disk peg1)))
+
+
+(define-init-action initialize-sizes 0
+  (product ?d1 disk ?d2 disk)
+  (< (position ?d1 *disk-names*) (position ?d2 *disk-names*))
+  ()
+  (assert (smaller> ?d1 ?d2)))
 
 
 (define-goal
-  (and (loc disk3 peg3)
-       (loc disk2 peg3)
-       (loc disk1 peg3)))
+  (forall (?disk disk)
+    (loc ?disk peg3)))

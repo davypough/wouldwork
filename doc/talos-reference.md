@@ -47,8 +47,8 @@ legitimately be fixed.
 **Does the spec assert any `wall-segment>`, `edge-segment>`, or `boundary-wall` facts?**
 
 - **Yes — coordinate-derived.** The movement and sightline tables are computed at
-  initialization from 2D segment geometry: `-walkability-coordinates` derives the `walking`
-  facts in `traversal-via` / `traversal-via>`, and `-beam-los-coordinates` derives `los-via`
+  initialization from 2D segment geometry: `-walkability-coordinates` derives the walk-kind
+  `traverse-via` / `traverse-via>` facts, and `-beam-los-coordinates` derives `los-via`
   plus the finite-barrier `los-barrier-crossings>` records. These facts are not in the file
   and cannot be transcribed from it. The geometry inputs are the authoritative source:
   `location-coords>`, `apparatus-coords>`, `wall-segment>`, `edge-segment>`,
@@ -81,11 +81,8 @@ answers and how barriers behave. Consult the technology summary for signatures.
 
 | Relation | Capability | Question to ask | Barrier semantics |
 |---|---|---|---|
-| `traversal-via walking location $list location` | Symmetric walking edge | Can the agent *walk between these two spots* now? | `$list` is DNF (1.3). The walking predicate also requires equal endpoint elevations and agent-dependent passability. |
-| `traversal-via> walking location $list location` | Directional walking edge | Can the agent walk *this way only*? | Same convention. Emitted for rides into an air stream's destination. |
-| `traversal-via` / `traversal-via>` (`stairway`) | Stairs edge (symmetric or directional) | Can grounded mobility use these stairs? | `$list` is DNF; elevation difference is unrestricted. |
-| `traversal-via` / `traversal-via>` (`jumping`) | Jumping edge (symmetric or directional) | Can grounded mobility *jump* this gap? | `$list` is DNF; feasibility uses the source and destination floor elevations. |
-| `traversal-via> climbing location $list location` | One-way climb (ladders) | Can the agent climb here? | `$list` is DNF, and each usable clause must contain a ladder positioned at the source. |
+| `traverse-via location $list location` | Symmetric traversal edge: every way to cross between the two spots, in one fact | Can an agent cross between these two spots now, and by what kind of move? | `$list` is DNF (1.3). Each clause's kind (walk, stairs, climb or jump) is inferred from the types it names, never authored (1.3, 1.4). `()` is a direct walk. |
+| `traverse-via> location $list location` | Directional traversal edge, source first | Can an agent cross *this way only*? | Same convention; the reverse may have a different clause list or none. Coordinate derivation emits these for air-stream rides into a stream's destination (inbound only). |
 | `reach-via location $list location` | Put/pickup across a gap *without walking* | Can cargo *cross while the agent stays put*? | `$list` is a **flat conjunction of barrier gates**, all of which must be open (1.5). Symmetric, agent-independent. |
 | `los-via visibility-object $list visibility-object` | Symmetric structural sightline | Is there a possible straight sightline from this location to that location, gate, apparatus, or gun? | Authored facts start from a location and carry gate/location occluders. Coordinate derivation also retains separate finite wall/edge/gate/boundary crossings (1.6). |
 | `los-barrier-crossings> los-endpoint $list visibility-object` | Oriented finite-barrier geometry | Which exact segment crossings does a coordinate-derived sightline encounter? | Derived, not authored. Beam and elevated-jammer policies interpolate elevation at each crossing; equality with a barrier's base or top still blocks. |
@@ -95,28 +92,41 @@ answers and how barriers behave. Consult the technology summary for signatures.
 
 ### 1.3 The DNF clause convention
 
-`traversal-via`, `traversal-via>`, and `controls` take a **disjunctive-normal-form clause
+`traverse-via`, `traverse-via>`, and `controls` take a **disjunctive-normal-form clause
 list**: `()` means direct and unguarded; a nonempty value is **OR over clauses, AND within a
 clause**. `((gate1) (gate2 gate3))` means *gate1 open, or else both gate2 and gate3 open*. A
 clause is a set of simultaneous conditions; multiple clauses are alternative routes.
-Collapsing alternatives into one flat list changes the meaning. Every traversal mode uses
+Collapsing alternatives into one flat list changes the meaning. Every traversal fact uses
 this shape; `reach-via` remains a flat conjunction.
 
-Allowed clause items depend on the mode, and `traversal-init-check` rejects anything outside
-that mode's registered vocabulary:
+**A clause's kind comes from its marker types** (`tech/-traversal.lisp`). Each kind's
+technology registers the types its clauses may name. A clause naming no marker is a walk; a
+clause naming markers of two kinds is an authoring error. `traversal-init-check` checks every
+clause against its own kind's vocabulary:
 
-- `walking`: gates, screens, ladders, and gears.
-- `stairway`: gates, screens, ladders, gears, and fixed blowers.
-- `jumping`: gates, screens, and walls, interpreted as path features to pass or clear.
-- `climbing`: gates, screens, and ladders; every usable clause must include a ladder
-  positioned at the source.
+| Kind (technology) | Marker types: decide the kind | Static separators: kept in the witness, not tested | Companions |
+|---|---|---|---|
+| walk (`walkability`) | none | — | gate, screen, gears |
+| stairs (`stairs`) | staircase | staircase | gate, screen, floor-/wall-/angled-gears, floor-/wall-/angled-blower |
+| climb (`ladder`) | ladder | — | gate, screen |
+| jump (`jump`) | edge, wall, floor-blower, floor-gears | edge, floor-blower, floor-gears | gate, screen |
+
+A problem that includes only some of these technologies simply has fewer kinds registered.
+One exception applies to problems whose locations carry bare levels rather than
+`location-coords>` geometry: a walk-kind clause across a level difference is read as a jump.
+With geometry on both endpoints, `traversal-init-check` rejects such a clause instead.
 
 ### 1.4 Passability and mobility modes
 
-Mobility is composed from the installed traversal modes (`walking`, `stairway`, `jumping`,
-`climbing`) by `mobility-results`, `mobility-locations`, and `traversable`; passability comes
-from `obstacle-clear` / `all-clear` in `tech/-passability.lisp`.
+Mobility is composed from the registered traversal kinds (walk, stairs, climb, jump) by
+`mobility-results`, `mobility-locations`, and `traversable`; passability comes from
+`obstacle-clear` / `all-clear` in `tech/-passability.lisp`. A traversal fact yields at most one
+grounded segment: kinds are tried cheapest first (`*traversal-kind-preference*`: walk, stairs,
+climb, jump), and within a kind the clauses in canonical order.
 
+- A **walk** requires equal endpoint levels and every door in the clause passable. A **stairs**
+  move has no level restriction. A **jump** is labelled VAULT when some feature genuinely needed
+  clearance, else JUMP.
 - A **gate** passes when open; a **screen** or **ladder** passes only when the agent is
   empty-handed; a **stream device** (gears or fixed blower) follows its current blowing
   state; a jump's gates, screens, and walls are path features to pass or clear.
@@ -169,7 +179,7 @@ groups in the current representation; each entry is one endpoint pair.
 1. **Walking is agent-dependent; reach and sight are not.** A path walkable empty-handed may
    be impassable while carrying a resource. `reachable` and `visible` take no agent argument.
 2. **Reach clears only through open gates** (1.5), unlike the same obstacle on a walking edge.
-3. **Traversal edges are disjunctive; reach edges are conjunctive.** A `traversal-via` list
+3. **Traversal edges are disjunctive; reach edges are conjunctive.** A `traverse-via` list
    offers alternative routes; a `reach-via` list is a set of gates that must *all* be open.
 
 Walking, reach, and sight are distinct graphs with distinct passability rules; a fact true in
@@ -321,14 +331,15 @@ Treat the sections below as a template: drop any the problem doesn't exercise, a
 problem-specific ones where a derived layer doesn't fit the headings.
 
 **1. Mobility network** (rules: 1.3, 1.4)
-- Each walking edge as a `walking` fact with its exact clause list, marking direction:
-  `traversal-via` is symmetric; `traversal-via>` is directional, and the reverse may have a
-  different clause list or none.
-- `stairway`, `jumping`, and `climbing` facts recorded separately from `walking`.
+- Each `traverse-via` fact with its exact clause list, marking direction: `traverse-via` is
+  symmetric; `traverse-via>` is directional, and the reverse may have a different clause list
+  or none.
+- The kind of each clause (walk, stairs, climb, jump), read from its marker types (1.3), so
+  stairs, climbs and jumps are visible separately from walks.
 - The passability rule for each obstacle kind the spec actually uses.
 - Air streams, if present, as derived bands.
-- Flag any location with no `walking` traversal edge at all, and any location reachable only
-  by a directional edge.
+- Flag any location with no walk-kind clause in any traversal fact, and any location reachable
+  only by a directional edge.
 - For a coordinate-derived spec, record the geometry inputs and the derived edge count, and
   note that the edge table comes from the load printout.
 
@@ -459,8 +470,8 @@ Once evidence supports an omitted relation or representative location, investiga
 
 **A missing location is the common case**, and the most tractable: a location that should
 exist as a standing spot, sight vantage, or reach endpoint, together with all its incident
-relations. The same method applies to any single missing relation instance: a `walking`
-traversal edge, a `reach-via` opening, or a `los-via` sightline.
+relations. The same method applies to any single missing relation instance: a
+`traverse-via` edge or clause, a `reach-via` opening, or a `los-via` sightline.
 
 **Working hypothesis, not a conclusion.** The procedure assumes the relevant mechanics are
 correct and one relation (or a location and its incident relations) explains the mismatch.
@@ -537,14 +548,14 @@ The appendix works all three at once.
 First confirm the facts are hand-authored, not derived (1.1). Then map each **unmet need** to
 exactly one relation, and choose its barriers deliberately.
 
-- *"The agent must be able to walk here"* → `traversal-via` entries in `walking` mode joining
-  the location to its neighbors, or `traversal-via>` if the passage is one-way. Choose the DNF
-  clause list.
-- *"The agent must be able to use stairs here"* → `traversal-via` / `traversal-via>` in
-  `stairway` mode, with a DNF enabling-means list.
-- *"The agent must be able to jump or climb here"* → `traversal-via` / `traversal-via>` in
-  `jumping` or `climbing` mode, with a DNF feature/means list; every usable climbing clause
-  must contain its positioned ladder.
+- *"The agent must be able to walk here"* → `traverse-via` facts joining the location to
+  its neighbors, or `traverse-via>` if the passage is one-way, with walk clauses (no marker
+  type). Choose the DNF clause list; `()` is a direct walk.
+- *"The agent must be able to use stairs here"* → a clause naming the `staircase` in the
+  pair's `traverse-via` / `traverse-via>` fact.
+- *"The agent must be able to jump or climb here"* → a clause naming the edge or wall (jump)
+  or the ladder (climb) in the pair's fact. Every usable climb clause must contain a ladder
+  positioned at the source. All ways to cross one pair go in that pair's single fact.
 - *"The target must be visible from here"* → one `los-via` fact from the vantage location to
   the relevant endpoint: a gate for direct gate jamming, an apparatus or gun for that fixture,
   or a location for connector pairing and a gears target resolved through `has-position`.
@@ -584,7 +595,7 @@ different conditions, which can be exactly right or a hole straight through the 
 ### 3.8 Pitfalls and anti-patterns (grows)
 
 - **Hand-adding a derived fact.** The spec asserts wall, edge, or boundary geometry, so the
-  `walking` traversal facts, `los-via`, and barrier-crossing records are computed at
+  walk-kind `traverse-via` facts, `los-via`, and barrier-crossing records are computed at
   initialization (1.1). Investigate the derivation and its inputs, then correct only a
   demonstrated mismatch with intent.
 - **Assuming a bridge.** Treating the missing relation as case 3.3(a) when it only extends one

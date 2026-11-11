@@ -1,0 +1,70 @@
+<mxfile host="Claude">
+  <diagram id="intersect-survey" name="intersect coarse model">
+    <mxGraphModel dx="800" dy="600" grid="1" gridSize="20" guides="1" page="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="note" value="Coarse model from A's exploration. North = facing G1 from the entry courtyard. Positions are rough; ? = unconfirmed." style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="700" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="north-unknown" value="area north of G1 (unknown)&lt;br&gt;blue field seen through passage window" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;fillColor=#F5F5F5;strokeColor=#999999;fontSize=10;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="300" y="80" width="380" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="red-unknown" value="beyond grille (unknown)&lt;br&gt;red-lit tripod: connector?" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;fillColor=#F5F5F5;strokeColor=#999999;fontSize=10;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="100" y="60" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="passage" value="NW passage&lt;br&gt;W: ivy wall&lt;br&gt;E: low wall with window? (looks into area north of G1)&lt;br&gt;N end: iron grille (window?)&lt;br&gt;connector (dark) in front of grille" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#B38F00;fontSize=9;align=left;spacingLeft=4;" vertex="1" parent="1">
+          <mxGeometry x="100" y="160" width="180" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="courtyard" value="entry courtyard (grass)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E8F5E0;strokeColor=#4D8033;fontSize=11;verticalAlign=bottom;" vertex="1" parent="1">
+          <mxGeometry x="300" y="240" width="380" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="G1" value="G1 (blue field, closed)" style="endArrow=none;html=1;strokeWidth=5;strokeColor=#3366FF;fontSize=10;labelPosition=center;verticalLabelPosition=top;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="420" y="240" as="sourcePoint" />
+            <mxPoint x="500" y="240" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="R1" value="R1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#3366FF;strokeColor=#001F80;fontColor=#FFFFFF;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="350" y="246" width="36" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="R1-facing" value="" style="endArrow=classic;html=1;strokeColor=#3366FF;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="368" y="282" as="sourcePoint" />
+            <mxPoint x="368" y="316" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="R1-controls-G1" value="controls" style="endArrow=classic;html=1;dashed=1;dashPattern=2 4;strokeColor=#999999;fontSize=9;fontColor=#999999;" edge="1" parent="1" source="R1" target="G1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="T1" value="T1 (lit)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#99B3FF;strokeColor=#3366FF;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="620" y="250" width="54" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="T1-facing" value="facing W/SW?" style="endArrow=classic;html=1;strokeColor=#3366FF;fontSize=9;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="620" y="270" as="sourcePoint" />
+            <mxPoint x="575" y="300" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="east-window" value="barred window?" style="endArrow=none;html=1;dashed=1;strokeWidth=3;strokeColor=#555555;fontSize=9;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="680" y="320" as="sourcePoint" />
+            <mxPoint x="680" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="purple-gate" value="purple field (gate?)" style="endArrow=none;html=1;strokeWidth=5;strokeColor=#9933CC;fontSize=9;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="680" y="440" as="sourcePoint" />
+            <mxPoint x="680" y="520" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="east-unknown" value="paved area east (unknown)&lt;br&gt;second purple field at far side" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;fillColor=#F5F5F5;strokeColor=#999999;fontSize=10;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="720" y="320" width="200" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="arcade" value="W/SW covered paved walk with arched barred opening (entry path?)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EEEEEE;strokeColor=#777777;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="100" y="380" width="180" height="160" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -59,7 +59,7 @@ The main orchestration is in [ww-parallel.lisp](/D:/quicklisp/local-projects/wou
 4. **Take another task or donate pending work.**  
    When its stack empties, a worker takes another queued task. If the queue is empty while other workers remain active, it waits.
 
-   Busy workers periodically check whether they can donate pending nodes. With the source defaults, donation is checked every 10,000 loop iterations, requires more than 256 pending nodes, and transfers about 20% when the shared queue is empty. It preferentially gives away shallower nodes, which may represent larger remaining branches.
+   Busy workers periodically check whether they can donate pending nodes. With the source defaults (`*donation-check-interval*`, `*donation-threshold*`, `*donation-fraction*` in `ww-settings.lisp`), donation is checked every 100 loop iterations, requires more than 16 pending nodes, and transfers about 20% when the shared queue is empty. It preferentially gives away shallower nodes, which may represent larger remaining branches.
 
    This is **work donation**: the busy worker hands work to the queue; idle workers do not reach into its private stack.
 

@@ -858,7 +858,7 @@ than hand-authoring them:
 (include-tech gate)                  ;controls; energized; update-gate-status!
 (include-tech beam-relay)            ;paired; color; pickup/put/connect actions
 (include-tech beam-crossing)         ;crossing-active; crossings-along-beam>
-(include-tech walkability)          ;walking traversal-via; mobility-results; traversable; move
+(include-tech walkability)           ;walk kind of traverse-via; one-step-walkable; move
 (include-tech visibility)            ;los-via; visible; visible-clear
 ```
 

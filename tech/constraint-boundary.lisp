@@ -1,6 +1,6 @@
 ;;; Filename: constraint-boundary.lisp
 
-;;; Optional supplied-transition diagnostic BT (T45, Extractor-Specifications.md section 6.3):
+;;; Optional supplied-transition diagnostic BT (doc/talos-diagnostics.md, BT):
 ;;; what one recorder boundary (STOP-RECORDER, CANCEL-PLAYBACK) or one support-changing
 ;;; engine action does to a supplied settled state.  Prerequisites are read separately from
 ;;; effects.  A closure whose prerequisites are unmet is evaluated only as a HYPOTHETICAL,
@@ -58,7 +58,7 @@
       (let ((invalid (arrangement-validation-reason
                        state (boundary-state-phase (arrangement-facts state)))))
         (when invalid
-          (format nil "~A: structurally invalid (section 6.2): ~A" label invalid)))))
+          (format nil "~A: structurally invalid (talos-diagnostics.md, RA): ~A" label invalid)))))
 
 
 (defun boundary-event-form (event)
@@ -107,7 +107,7 @@
 
 
 (defun boundary-role-fact (body role)
-  "The fact T44's ROLE for BODY asserts (section 13.8)."
+  "The fact a CP reservation ROLE for BODY asserts (talos-diagnostics.md, CP, reservations)."
   (ecase (first role)
     (:weight (list 'on body (second role)))
     (:jam (list 'jamming body (second role)))
@@ -278,7 +278,7 @@
          "successor is not a fixed point under a second propagation pass")
         (t (let ((invalid (arrangement-validation-reason
                             successor (boundary-state-phase (arrangement-facts successor)))))
-             (when invalid (format nil "successor structurally invalid (section 6.2): ~A" invalid))))))
+             (when invalid (format nil "successor structurally invalid (talos-diagnostics.md, RA): ~A" invalid))))))
 
 
 (defun boundary-effects (state event prerequisites)
@@ -465,7 +465,7 @@
 
 
 (defun boundary-obligation-verdict (phase held-before held-after)
-  "An obligation's verdict for its PHASE (section 6.3)."
+  "An obligation's verdict for its PHASE (talos-diagnostics.md, BT)."
   (cond ((and (member phase '(:until-event :across)) (not held-before)) :not-held-before)
         ((eq phase :until-event) (if held-after :kept :expended))
         ((eq phase :across) (if held-after :survives :lost))
@@ -481,7 +481,7 @@
 
 
 (defun boundary-consequences (scenario before-state after-state)
-  "Every consequence family of section 6.3 for the two states."
+  "Every BT consequence family (talos-diagnostics.md, BT) for the two states."
   (let* ((before (arrangement-facts before-state))
          (after (arrangement-facts after-state))
          (arcs (traversal-arc-facts))
@@ -534,7 +534,7 @@
 
 (defun boundary-transition-result (scenario)
   "BT: what one recorder boundary or support change does to a supplied settled state.
-   Returns a plist; the caller's state and scenario are never changed (section 6.3)."
+   Returns a plist; the caller's state and scenario are never changed (talos-diagnostics.md, BT)."
   (let ((reason (handler-case (boundary-scenario-reason scenario)
                   (error (condition) (format nil "input check exception: ~A" condition)))))
     (if reason

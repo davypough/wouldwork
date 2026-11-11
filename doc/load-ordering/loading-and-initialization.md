@@ -3,7 +3,7 @@
 Reference for framing analysis. Every claim below is cited to a file and to the named function or
 form it concerns, so it can be re-checked rather than remembered. Citations deliberately omit line
 numbers, which go stale on the first edit above them. Scope runs from ASDF bootstrap through the end
-of `init()`; search-time execution is deliberately out of scope. Source-checked on 2026-10-02;
+of `init()`; search-time execution is deliberately out of scope. Source-checked on 2026-11-10;
 historical outcomes in the worked example were not rerun for this review.
 
 The reason this document exists: wouldwork makes *ordering* load-bearing across five distinct
@@ -46,7 +46,7 @@ Load order:
 ww-packages, ww-utilities, ww-hstack, ww-preliminaries, ww-settings,
 ww-problem-lifecycle, ww-structures, ww-action-format, ww-worker-read-snapshots,
 ww-relaxed-heuristics, ww-converter, ww-validator, ww-frequencies,
-ww-support, ww-happenings, ww-translator,
+ww-support, ww-arc-consistency, ww-happenings, ww-translator,
 ww-init-validator, ww-installer, ww-propagation-order, ww-patroller-installer,
 ww-interface, ww-test-characterization, ww-problem-tests, ww-set, ww-command-tests, ww-enumerator-build,
 ww-enumerator-run,
@@ -54,7 +54,8 @@ ww-enumerator-run,
 ww-action-trace, ww-goal-chaining, ww-advisor, ww-solution-validation,
 ww-goal-chain-persistence, ww-search-checkpoint, ww-backward,
 ww-planner, ww-symmetry, ww-searcher, ww-backtracker,
-ww-parallel-infrastructure, ww-parallel, ww-initialize
+ww-parallel-infrastructure, ww-parallel, ww-parallel-backtracker,
+ww-failed-state-memory, ww-initialize
 ```
 
 Two positions in this list carry weight. `ww-translator` and `ww-installer` load *before*
@@ -207,19 +208,28 @@ hypothetical.
 does the domain get resolved in" is already the wrong frame — it was resolved before `init()` was
 called. Deferred action installation is the explicit exception described in Stage 5, step 0.
 
-**2. `doall` over a bare type name bakes a literal; over a query it does not.**
-`translate-doall` (`ww-translator.lisp`) has two branches. `static-single-p` emits
-`(dolist (var '<literal domain> t) ...)`. A type slot holding a query call instead emits
-`(ut::transpose (eval-instantiated-spec ',type-inst state))` — evaluated at runtime
-against state. This is the only escape hatch for a population that isn't known at load time, and
+**2. `doall` over a bare type name bakes its domain; over a query it does not.**
+`translate-doall` (`ww-translator.lisp`) first asks `dynamic-quantifier-domain-p` whether any
+type slot is a query call or a `$variable`. For a static one-variable domain,
+`single-quantifier-domain` emits `(dolist (var <domain> t) ...)`, where `<domain>` is the type's
+instance list quoted at translation time — wrapped in `(symmetry-visit-domain '<list> '<type> state)`
+when it has two or more members, which only reorders that fixed list for symmetry visiting. A
+static multi-variable domain likewise bakes its instantiation collection, passed through
+`symmetry-visit-collection`. A type slot holding a query call instead makes
+`quantifier-collection-form` emit
+`(ut::transpose (eval-instantiated-spec (symmetry-visit-type-inst '<type-inst> state) state))` —
+evaluated at runtime against state. A query domain (or a `$variable` domain, also evaluated at
+runtime) is the only escape hatch for a population that isn't known at load time, and
 `probs/problem-corner.lisp` uses it: `beam ()` is declared empty, and every iteration site says
 `(doall (?b (get-current-beams)))`.
 
 **3. Pre-scan makes type names exist with zero instances.**
 `predeclare-type-names` sets `(gethash type *types*)` to `nil` (`ww-installer.lisp`).
-`static-single-quantifier-domain` (`ww-translator.lisp`) checks `present-p`, which is now true
-with an empty domain — so a `doall` translated before the real `install-types` runs collapses via
-`translate-empty-static-quantifier` into a silent no-op. Not an error. This is the mechanism that
+`single-quantifier-domain` (`ww-translator.lisp`) checks `present-p`, which is now true
+with an empty domain, and returns a `nil` domain; a multi-variable static collection is likewise
+caught by `empty-quantifier-collection-p`. Either way a `doall` translated before the real
+`install-types` runs collapses via `translate-empty-static-quantifier` into a constant `t` — a
+silent no-op. Not an error. This is the mechanism that
 punishes putting `define-types` below the tech includes.
 
 **4. Init-actions are silently skipped, not errored, when a pre-param type is empty.**
@@ -252,6 +262,15 @@ do not appear in them.
 retroactively edit an already-compiled `dolist` literal. Dynamically registered objects are
 reachable through a predicate test or a query-domain `doall`, never through a static-domain one. It
 also errors past 999 total planning objects.
+
+Registration during initialization (init-actions, as in the worked example below) needs no
+declaration. A problem whose search actions or their helpers register objects must list those
+types, e.g. `(ww-set *search-registers-dynamic-objects* (beam))`. The setting is a declaration,
+not an enabler: `register-dynamic-object` always calls `reject-worker-read-write`, so it errors
+whenever parallel worker read snapshots are frozen. `validate-worker-read-snapshot-mode`
+(`ww-worker-read-snapshots.lisp`) uses the declaration to refuse snapshot-mode search up front,
+advising `(ww-set *threads* 0)`, instead of failing mid-search. Like `*max-connector-pairings*`,
+it is managed but not persisted to `vals.lisp`.
 
 **9. The `.asd` bootstrap cannot splice.**
 `problem-blocks3.lisp` must stay free of `include-tech` directives. Documented in the `.asd`

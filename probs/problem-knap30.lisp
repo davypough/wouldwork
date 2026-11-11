@@ -1,7 +1,8 @@
 ;;;; Filename: problem-knap30.lisp
 
 ;;; Problem specification for a 30-item knapsack problem.
-;;; Same rules as problem-knap19-1.lisp, with the data from data-knap30.lisp.
+;;; Same rules as problem-knap19.lisp before its ascending-order change (unordered puts,
+;;; graph search), with the data from data-knap30.lisp.
 
 
 (in-package :ww)  ;required

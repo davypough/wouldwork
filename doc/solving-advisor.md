@@ -156,7 +156,7 @@ questions.
    truncation separately; an out-of-memory crash is neither a bound nor a result.
    Discuss a lower cutoff with D after such a crash; do not silently retry.
 5. On a surprise, read the semantics and file the missing general question in
-   `doc/constraint-led-solving/Schema-Gaps.txt`. Record complex development needs
+   `doc/open-issues.txt`. Record complex development needs
    there with origin, need, proposed scope, dependencies and acceptance criteria;
    recording a need is not implementation approval. Record any blocker and next
    step in the affected problem's Handoff, and agree new work with D separately.
@@ -672,7 +672,7 @@ returned segment. Region-quotient rows alone do not specify every location arc.
 ### Optional tools, on D's request
 
 Load diagnostics with `(load (merge-pathnames <file> (asdf:system-source-directory :wouldwork)))`.
-Their contracts are in `doc/constraint-led-solving/Extractor-Specifications.md`.
+Their contracts are in `doc/talos-diagnostics.md`.
 
 - **Probe battery:** load `tech/constraint-probe-battery.lisp` after the profile.
   `(report-probe-battery-list)` lists without searching. At threads 16,
@@ -684,49 +684,49 @@ Their contracts are in `doc/constraint-led-solving/Extractor-Specifications.md`.
   one-step opportunities. For all applicable actions load
   `tech/constraint-state-probe.lisp` and use `(report-applicable-actions <action-prefix>)` after fresh staging.
 - **Role obligations (RO) / cycle-plan check:** `(report-role-obligations <scenario>)`
-  and `(report-cycle-plan-check <plan>)` use explicit data (specifications 4/13).
+  and `(report-cycle-plan-check <plan>)` use explicit data (`talos-diagnostics.md`, RO and CP).
   PASS is not a plan witness; CONDITIONAL names a premise to settle with D.
   A stage's `:reservations` state each body's jobs over a phase range, e.g.
   `(:body <b> :role (:jam <target>) :from "<id>" :through "<id>" :purpose "<text>")`;
-  roles are `:weight`, `:jam`, `:place`, `:hold`, `:mount`, `:support` (13.8).
+  roles are `:weight`, `:jam`, `:place`, `:hold`, `:mount`, `:support` (CP, reservations).
   B5 then reports shared and conflicting jobs, capacity, the eligible pool and
   releases; a shortage refutes only that allocation. Nothing is reserved unless stated.
 - **Ledger:** removed 2026-10-02 (`tech/constraint-ledger.lisp` and its schema,
   `Status-Algebra-and-Record-Schema.md`; both in git history). The Briefing's subgoal
   log covers its role. If a problem's premises and retractions outgrow the log,
-  record the need in `Schema-Gaps.txt` and the problem's Handoff; agree with D
+  record the need in `doc/open-issues.txt` and the problem's Handoff; agree with D
   whether to restore and adapt the ledger.
 - **Supplied relay views:** `(report-relay-view-scenario <scenario>)` tests explicit
-  complete-state scenarios (specification 6.1). Optional scenarios also go to
+  complete-state scenarios (RC, supplied relay views). Optional scenarios also go to
   REPORT-RELAY-CHAIN-TABLE, REPORT-NECESSITY-HINTS and profile report/write calls.
   Never combine hops from different scenarios; CLEAR proves no stable/reachable setup.
 - **Supplied crossings:** `(report-beam-crossing-scenario (list :state <state> :provenance "<text>"))`
   evaluates one settled state, such as a replayed prefix's
   `(action-sequence-validation-final-state (validate-action-sequence *start-state* <actions>))`,
   with the engine's queries: gates read, active crossings, and each live beam's crossings labelled ACTIVE,
-  REACHED/INACTIVE, BEYOND CUT, BEYOND CLOSED, BEYOND WALL or BEYOND BODY (specification 8.10). An unsettled or
+  REACHED/INACTIVE, BEYOND CUT, BEYOND CLOSED, BEYOND WALL or BEYOND BODY (BX). An unsettled or
   incomplete input is UNRESOLVED. It proves no reachability or composition.
 - **Supplied relay lighting:** `(report-relay-lighting-scenario (list :state <state> :provenance "<text>"))`,
-  optionally `:view :recording` (open cycle only) and `:chains <chains> :phase <phase>` for T33's
+  optionally `:view :recording` (open cycle only) and `:chains <chains> :phase <phase>` for supplied-view
   verdicts, replays one settled state's lighting by propagation layer: each relay LIT, CONFLICT,
   SAME-SIDE CONNECTOR ALREADY LIT HERE (a clash), UNREACHED or ABSENT; each stored link's sightline, cut and outcome
   (DELIVERED, IGNORED later, SOURCE DARK, NOT CLEAR); outgoing/incoming capacity; receivers,
-  with engine agreement checked (specification 8.11). For that state only.
+  with engine agreement checked (RL). For that state only.
 - **Supplied equipment:** `(report-equipment-scenario (list :state <state> :provenance "<text>"))`,
   optionally `:before <state> :before-provenance "<text>"`, reads one settled state's fans (MOUNTED,
   HELD, RESTING; STEPPABLE), mounts (EFFECTIVE STREAM, TURNING NO FAN, FAN MOUNTED STOPPED, VACANT
   STOPPED), boarding, mounting and removal verdicts with their failing conditions, and lifted
   occupants with what would drop them; with `:before`, what changed between the two states.
-  Engine agreement is checked (specification 8.12). For that state or pair only.
+  Engine agreement is checked (EQ). For that state or pair only.
 - **Supplied service transition:** `(report-service-transition (list :before <state> :before-provenance "<text>"
   :state <state> :provenance "<text>"))`, optionally `:agent`, `:transit`/`:return` (locations) and
   `:final` (propositions), compares two settled states: each passage service KEPT, KEPT BY
   ALTERNATIVE (OVERRIDE when only jams remain), LOST or GAINED; supplies withdrawn or added and
   the devices they drive; arcs, mobility and retrieval lost or gained; requirements MET or NOT MET
-  (specification 8.13). It says nothing about which action caused a change or about ordering.
+  (SW). It says nothing about which action caused a change or about ordering.
 - **Supplied stability:** load `tech/constraint-arrangement.lisp`; call
   `(report-relay-arrangement <scenario>)` or `(check-relay-arrangement <scenario>)`.
-  Specification 6.2 requires a complete configuration, phase, provenance, view,
+  RA requires a complete configuration, phase, provenance, view,
   receiver and chain, with primitive controls and no forced gate premises.
   Private-copy propagation and a second-pass fixed point distinguish working,
   failed, invalid/inconsistent and unresolved arrangements. Preserve plate-edge
@@ -737,13 +737,13 @@ Their contracts are in `doc/constraint-led-solving/Extractor-Specifications.md`.
   :provenance "<text>" :event <event>))`, where the event is `(:stop <ghost agent>)`,
   `(:cancel <live agent>)` or `(:action <action form>)` for one action that changes a support
   (ON, a held tray, a fan mount) or the recorder session. Optional `:agents` and `:obligations`,
-  each `(:fact <prop>)`, `(:body <b> :role <T44 role>)` or `(:reach (<agent> <location>))` with
+  each `(:fact <prop>)`, `(:body <b> :role <CP reservation role>)` or `(:reach (<agent> <location>))` with
   `:phase :until-event`, `:across` or `:after` and a `:purpose`. Prerequisites are itemized
   apart from effects; a STOP or CANCEL whose prerequisites fail is still closed by the engine's
   own closure as HYPOTHETICAL. Reports supports and chains (RETAINED, CHANGED, REMOVED), plates
   by occupant layer, pairings and receivers in both views, devices, each agent's route
   conditions in its own view, and obligations EXPENDED, SURVIVES, LOST, MET or NOT MET
-  (specification 6.3). For that state and event only; not reachability or a plan.
+  (BT). For that state and event only; not reachability or a plan.
 
 ### Engine facts: beams, relays and connectors
 
@@ -777,22 +777,20 @@ reached at a location where a connector of its own recorder layer is already lit
 clash, and the state is discarded; live and ghost connectors at one location light
 independently. A receiver needs a relay of its hue whose own pairing names it.
 
-## Directory and development history
+## Supporting files
 
-Supporting material is under `doc/constraint-led-solving/`: `Extractor-Specifications.md`
-describes the Talos diagnostics, and `Schema-Gaps.txt` records schema gaps and
-development needs. Problem records, including the triangle pilot (`triangle-xyz-6`),
-are in `doc/problems/<problem-name>/`. Older `Analysis.txt` files retain their recorded
-status; they are not required coordination records.
+`doc/talos-diagnostics.md` describes the Talos diagnostics, and `doc/open-issues.txt`
+records schema gaps and development needs. Problem records, including the triangle pilot
+(`triangle-xyz-6`), are in `doc/problems/<problem-name>/`. Older `Analysis.txt` files retain
+their recorded status; they are not required coordination records.
 
-The diagnostic development is complete through T46, with no active work queue. Its
-implementation plans and crelay-topo's experiment record (`archive/`) and the dated
-check scripts and run records (`evidence/`) were removed 2026-10-02; they are in git
-history, and their scripts run only at their own commit.
-
-Old paths in verbatim quotations and dated schema-gap entries are kept as written. Map
-them as follows: `doc/constraint-method/` to `doc/constraint-led-solving/`;
+The diagnostics' development history (task records T6-T46, the crelay-topo experiment
+register, plans and evidence) is in git history only. Old paths in verbatim quotations and
+dated entries are kept as written; map them as follows:
+`doc/constraint-led-solving/Extractor-Specifications.md` to `doc/talos-diagnostics.md`;
+`doc/constraint-led-solving/Schema-Gaps.txt` to `doc/open-issues.txt`;
+`doc/constraint-method/` and `doc/constraint-led-solving/` (both retired);
 `doc/constraint-led-solving/problems/` to `doc/problems/`; the triangle pilot
 (`doc/constraint-pilot/`, later `doc/constraint-led-solving/constraint-pilot/`) to
 `doc/problems/triangle-xyz-6/`; `Problem-Solving-Guide.md` to `doc/solving-advisor.md`.
-The former `doc/README.md` is absent. These mappings restore no deleted file.
+These mappings restore no deleted file.

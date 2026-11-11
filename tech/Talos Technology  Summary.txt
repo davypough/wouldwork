@@ -20,11 +20,11 @@ jammer
 ladder
 location
 mode
-traversal-mode  ;instances walking, stairway, jumping, climbing
 pressure-plate
 receiver
 recorder
 screen
+staircase  ;a static stairway separator; a traversal clause naming one is a stairway
 switch
 toggle-plate
 transmitter
@@ -49,8 +49,10 @@ fixed-position-object (either pressure-plate toggle-plate ladder floor-gears wal
 gears (either floor-gears wall-gears angled-gears)
 blower (either floor-blower wall-blower angled-blower)
 heighted-object (either box gate agent screen wall edge jammer connector floor-repeater wall-repeater)
+jump-landing-support (either box tray)
 mobile-object (either agent box jammer connector fan tray)
 plate (either pressure-plate toggle-plate)
+recording-blower-drive (either floor-blower wall-gears wall-blower)
 relay (either connector floor-repeater wall-repeater)
 repeater (either floor-repeater wall-repeater)
 steppable-object (either pressure-plate toggle-plate fan floor-blower angled-blower)
@@ -84,8 +86,13 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (recorder-cycle-closed)  ;set by a normalized stop-recorder or cancel-playback boundary
 (recorder-cycle-stopped-by-ghost)  ;distinguishes normal ghost STOP from live cancellation
 (recorder-cycles-used $fixnum)  ;planner-state count incremented by start-recorder
+(recording-active receiver)  ;derived recording-side shadow of active
+(recording-depressed plate)  ;derived recording-side shadow of depressed
 (recording-in-progress)  ;true between start-recorder and either explicit ending
+(recording-latched toggle-plate)  ;derived recording-side shadow of latched
+(recording-open gate)  ;derived recording-side shadow of open
 (recording-switched-on switch)  ;recording-side persistent switch state
+(recording-turning recording-blower-drive)  ;derived recording-side shadow of turning
 (selected connector terminus)  ;pending pairing chosen by select-termini; put-connector pairs and clears it
 (switched-on switch)  ;persistent ordinary state; absence means off
 (turning (either floor-gears wall-gears angled-gears floor-blower wall-blower angled-blower))
@@ -101,7 +108,9 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (coupled fixed-beam-source fixed-beam-sink)  ;directional; fixed couplings unlimited
 (crossings-along-beam> los-endpoint $list los-endpoint)
 (beam-crossings-before-gate> los-endpoint $list gate los-endpoint)
-(current-beam-crossings $list)
+(crossings-coincide> crossing crossing)  ;same point on a shared beam, asserted both ways
+(crossing-parameter> crossing los-endpoint los-endpoint $rational)  ;position along the beam, each way
+(current-beam-crossings $list)  ;the crossing pool itself, in crossing1, crossing2, ... order
 (edge-segment> edge $rational $rational $rational $rational $rational)  ;x1 y1 x2 y2 base-z; base-z optional, default 0
 (gate-segment> gate $rational $rational $rational $rational $rational)  ;x1 y1 x2 y2 base-z; base-z optional, default 0
 (has-chroma (either transmitter receiver) $hue)
@@ -112,14 +121,19 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (location-coords> location $rational $rational $rational)  ;third is the location's own level, optional, default 0
 (los-via visibility-object $list visibility-object)  ;symmetric sightline; $list is a flat conjunction of gate and location occluders, all of which must be transparent
 (los-barrier-crossings> los-endpoint $list visibility-object)  ;directed records (:kind identity parameter x1 y1 x2 y2), including fixed couplings and gate targets
+(occluder-parameter> location los-endpoint los-endpoint $rational)  ;an occluding location's position along the beam, each way
+(reach-disallowed> reach-target reach-target)  ;authored suppression of one derived reach pair
 (reach-via reach-target $list reach-target)  ;authorizes manipulation, including from a location to switch apparatus; not movement
 (reach-via> location $list reach-target)  ;directional reach, reacher first; for a one-way opening only, never for a height difference
 (recording-copy> $mobile-object $mobile-object :bijective)  ;indexed one-to-one live -> ghost mapping
 (screen-segment> screen $rational $rational $rational $rational $rational)  ;x1 y1 x2 y2 base-z; base-z optional, default 0
 (stream-width (either wall-gears wall-blower) $rational)  ;default 3 units
 (threatens threat location)
-(traverse-via traversal-mode location $list location)  ;symmetric traversal edge; $list is DNF: () direct, else OR over clauses, AND within
-(traverse-via> traversal-mode location $list location)  ;directed traversal edge, source first, same $list convention
+(traverse-via location $list location)  ;symmetric traversal edge; $list is DNF: () direct, else OR over clauses, AND within;
+                                        ;each clause's kind is inferred from its marker types, never authored:
+                                        ;ladder -> climb, staircase -> stairs, edge/wall/floor-blower/floor-gears -> jump, none -> walk
+(traverse-via> location $list location)  ;directed traversal edge, source first, same $list convention
+(vertical-profile> vertical-object $rational $keyword $rational)  ;derived at init from *vertical-type-constants*: height, axis, base defaults
 (wall-segment> wall $rational $rational $rational $rational $rational)  ;x1 y1 x2 y2 base-z; base-z optional, default 0
 (window-segment> window $rational $rational $rational $rational $rational)  ;x1 y1 x2 y2 base-z; base-z optional, default 0
 
@@ -129,7 +143,8 @@ visibility-object (either gate transmitter receiver floor-repeater wall-repeater
 (mount-fan ">" ?agent "mounts" ?fan "on" ?gears "at" $g-location)
 (move ">" ?agent "moves via" $route)
 (pickup-box ">" ?agent "picks up" ?box "at" $box-location "from" $a-location)
-(pickup-connector ">" ?agent "picks up" ?connector "at" $a-location)
+(pickup-connector ">" ?agent "picks up" ?connector "at" $a-location)  ;clears its pairings and any selections of it
+(pickup-connector-retaining-pairings ">" ?agent "picks up" ?connector "retaining pairings at" $a-location)  ;offered only when paired; pairings survive, beam resumes at put-down
 (pickup-fan ">" ?agent "picks up" ?fan "at" $fan-location "from" $a-location)
 (pickup-jammer ">" ?agent "picks up" ?jammer "at" $a-location)
 (pickup-tray ">" ?agent "picks up" ?tray "at" $tray-location "from" $a-location)
@@ -195,8 +210,10 @@ wall-gears 1, wall-blower 1  ;their has-elevation is the emitted STREAM elevatio
 Technology-owned default (DEFPARAMETER after INCLUDE-TECH to override):
 *beam-occlusion-tolerance* 1/2  ;tech/-beam-los-coordinates.lisp; max perpendicular distance a location may sit off a beam's line and still count as a candidate occluder
 *boundary-wall-height* 6  ;tech/-segment-geometry.lisp; boundary polygon LOS height
+*horizontal-reach-limit* 5/2  ;tech/-reachability-coordinates.lisp; greatest horizontal separation for a derived reach-via edge
 *vertical-reach-limit* 1  ;tech/-support-elevation.lisp; max elevation gap for manipulation, landing, and barrier clearance
 
 Managed problem parameters (WW-SET, restored on staging):
 *max-recorder-cycles* 1  ;maximum START-RECORDER actions in one planner path, or NIL for no limit; a cycle counts when it starts
-*max-connector-pairings* 3  ;tech/beam-relay.lisp; max PAIRED links a connector may have at any time, counting links on both sides and links retained through a pickup; connector pairings only -- fixed COUPLED corridors are unlimited; a problem may set a smaller value first
+*recorder-prefix-pruning* NIL  ;when T, search also rejects an open recording prefix that can no longer be replayed
+*max-connector-pairings* 3  ;NIL until tech/beam-relay.lisp supplies 3; max pairings a connector may have at any time, counting pairings on both sides, pairings retained through a pickup, and pending SELECTED facts; connector pairings only -- fixed COUPLED corridors are unlimited; a problem may set a smaller value first

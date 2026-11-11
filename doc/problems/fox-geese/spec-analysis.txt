@@ -15,7 +15,6 @@ PROBLEM / REVISION / AUTHORIZED SCOPE
 
 INPUT ANALYSIS AND OBJECTIVE
   Current: doc/problems/fox-geese/problem-analysis.txt (revision 1, 2026-10-18).
-  Snapshot: doc/problems/fox-geese/problem-analysis-2026-10-18-before-spec.txt (until wrap-up).
   Objective, answer identity, rules R1, approach R2, merging R3, exhaustiveness R4,
     variants R5: as agreed there.
   Fixed geese rule for the strategy check: not defined by the analysis; agreed
@@ -401,3 +400,5 @@ CORRECTIONS AND HISTORY
     the geese to move (the geese-first game); it showed 0 losing replies at lookahead 3.
     Wouldwork's fox-first audit found 1; the corrected check agrees, and lookahead 4
     with the walk-now tie-break was adopted.
+  2026-11-10: deleted snapshot problem-analysis-2026-10-18-before-spec.txt before wrap-up
+    (it was identical to problem-analysis.txt; the analysis was never revised).

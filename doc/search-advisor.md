@@ -411,7 +411,7 @@ S14 = C5, S15 = B17.
 | B1 | **Symmetry pruning** | Q7: interchangeable objects | `*symmetry-pruning*` t; staging reports which families are kept | Time it as well as counting what it saves (note 3); `(audit-symmetry)` compares results with pruning on and off; drops symmetric variants under `every` (section 5); a re-encoding (B16) is often cheaper |
 | B2 | **Dead-state pruning** | Q10: some states can be proved dead | `prune-state?` (section 4.1) | Must be **sound**: a test that rejects a live state silently discards solutions (note 3) |
 | B3 | **State constraints** | A rule every state must keep | `define-constraint`: a successor breaking it is discarded as it is generated | Must be a true rule of the puzzle, not a guess |
-| B4 | **Independent-move reordering** | Independent moves made in different orders reach the same state: above all an action choosing members of a set (knap19's `put`) | Spec idiom: the action may choose only an object numbered above every one already chosen, with A3 tree search (`problem-knap19-1.lisp`, note 13).  *Proposed:* an engine version for independent moves in general | Two moves are independent when either order is legal and ends in the same state; argue it for the action before relying on it (note 13).  The engine version would need each action's read and write facts |
+| B4 | **Independent-move reordering** | Independent moves made in different orders reach the same state: above all an action choosing members of a set (knap19's `put`) | Spec idiom: the action may choose only an object numbered above every one already chosen, with A3 tree search (`problem-knap19.lisp`, note 13).  *Proposed:* an engine version for independent moves in general | Two moves are independent when either order is legal and ends in the same state; argue it for the action before relying on it (note 13).  The engine version would need each action's read and write facts |
 | B5 | **Failed-state memory** | Tree search with a depth cutoff (forced by happenings, or chosen) where states repeat | `(ww-set *failed-state-memory* t)` (REPL or spec).  A state whose subtree reaches no goal is recorded with its moves left; a repeat with no more moves left is skipped.  The key holds each happening's place in its cycle, not absolute time, so repeats are found at different depths (note 12) | Requires a depth cutoff and replaces the check against states on the current path, so every-solution runs also count plans that revisit a state (the goal states are the same).  An error at search start with graph search, csp, backtracking, auto-wait, min-time and value objectives, and path-dependent validators.  One entry per failed state.  Sentry: about 4 times less work for the shortest plan; less where many subtrees reach a goal |
 | B6 | **Lower bound on moves** | Q9: a cheap bound that never overestimates | `min-steps-remaining?` (section 4.1: distance plus obligations, exact bounds); for Talos problems, `(include-tech topo-lower-bound)` | Must never overestimate; consulted only with a depth cutoff, or after a solution under `min-length` or `first`; check it against runs without it (section 4.1) |
 | B7 | **Relaxed h-max and LM-cut bounds** | Q9, where states are costly to generate or a cheaper bound is far below the true distance | Talos: `topo-lower-bound`.  Other problems: the spec describes a relaxed version of its moves and calls `declare-relaxed-model` (`problem-tiles7a-heuristic-2.lisp`, note 14); the engine adds its LM-cut value as an automatic bound | The spec must argue that every real move is allowed in the relaxed version; it cannot be built from the actions automatically.  Refused with happenings.  Costly: tiles7a 3.6 ms per state against 3 microseconds of search, 60 times slower overall despite a stronger bound (note 14) |
@@ -653,7 +653,7 @@ same approaches with their entry points.
    `doc/problems/knap19/search-analysis.txt`): an independent count gave 36,326 packings, all
    but 18 reachable in more than one order; unordered graph search generated 231,159 states
    for them (6.4 times; knap30 6.3 times), tree search with unordered puts would follow about
-   1.5 billion paths.  `problem-knap19-1.lisp` (ascending puts, tree search): without the
+   1.5 billion paths.  The ascending-puts version (now `problem-knap19.lisp`, tree search): without the
    bound 36,326 states generated and expanded, 0.1 s against 0.3 s; with it 432 program
    cycles as before (456 states generated against 432), best value unchanged.  The waste
    factor is the average number of items chosen, so the gain grows with larger subsets and
@@ -1213,7 +1213,7 @@ columns add constraints, so length is harmless.  Addends 2, 3, 4, 6 (length 6): 
 hand-written column action per column, a family of any size calls for a spec that builds its
 actions from the words.
 
-Hanoi (peg-per-disk encoding, cutoff 2^n - 1, 16 threads): 10 disks 6.6 s, 11 disks 54.9 s,
+Hanoi (`problem-hanoi.lisp` with `*disks*` set, peg-per-disk encoding, cutoff 2^n - 1, 16 threads): 10 disks 6.6 s, 11 disks 54.9 s,
 growing 8.3 times per disk while the boards grow only 3 times, because a board is expanded
 again each time a shorter route reaches it (section 6.1).  Projected: 14 disks overnight
 (4.6 to 8.7 hours), 15 out of reach.  A breadth-first search would expand each board once,

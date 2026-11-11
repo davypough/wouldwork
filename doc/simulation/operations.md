@@ -56,6 +56,13 @@ Goal: a shared description precise enough to reason about beams.
 
 - D walks each area that can be reached and stops at each fixture; A takes a screenshot at
   each stop and writes down what it sees.
+- Pointing routine, one item at a time: D puts the crosshair on the item and says what it
+  is; A takes a screenshot, names the item (D's name if given), and adds it to the diagram;
+  D confirms or renames.  If A does not know how the item works, D explains, and the
+  Briefing marks the fact *told*.
+- A cannot judge positions from a first-person screenshot.  Where position matters for
+  beams, D gives a measure, such as floor tiles counted from a named corner.  These tile
+  coordinates also serve a spec later.
 - Record, in the problem's own terms: areas and what joins them (gates, ladders, windows);
   walls and window spans; every transmitter and receiver with its colour and the way it
   faces; connectors and other objects with their starting places; plates; what each gate
@@ -65,8 +72,12 @@ Goal: a shared description precise enough to reason about beams.
 - Walk the whole of every area, corners and side strips included.  In intersect the
   solution ran through a strip of the first room that had no named location, and every
   impossibility argument had silently left it out.
-- If D has a diagram, A checks it against the screenshots.  If not, D may draw one, or A
-  keeps the description as a list.
+- A builds the layout as a draw.io diagram, `doc/problems/<problem-name>/<problem-name>.drawio`,
+  updating it after each item.  D may open it (draw.io desktop or the VS Code extension),
+  move or relabel things; A re-reads the file before each edit, so there is one shared
+  copy.  Conventions: transmitters and receivers drawn just off the side of the wall they
+  face, with an arrow for the facing direction; gates on the wall span they close; windows
+  as dashed spans.  If D already has a diagram, A checks it against the screenshots.
 - Name places as D names them (location1, gate2, window3).  No invented region labels.
 
 ### 2. Agree the facts and the goal
@@ -123,7 +134,8 @@ use (`doc/solving-advisor.md`, *Records and templates*):
 |---|---|
 | `Briefing.md` | the running record: survey, agreed facts, each chunk and its result, premise ledgers, game rules learned, the result |
 | `Handoff.md` | a short current status, so a fresh session can continue: next step, state, how to restore, open items |
-| `<problem-name>-diagram.png` | D's diagram of the level, when there is one |
+| `<problem-name>.drawio` | the shared layout diagram built during the survey and kept current |
+| `<problem-name>-diagram.png` | D's own diagram of the level, when there is one |
 | `Actions.lisp`, `Validation.txt` | the accepted action list and its engine validation, once a spec exists |
 | `problem-analysis.txt`, `spec-analysis.txt`, `search-analysis.txt` | the problem, spec and search advisors' records, when those advisors are used |
 
@@ -131,7 +143,7 @@ The problem spec itself, when one is written, is `probs/problem-<problem-name>.l
 
 What does not go in the problem's directory:
 - differences between the game and the Wouldwork engine: entered as needs in
-  `doc/constraint-led-solving/Schema-Gaps.txt` (implementation only with D's approval);
+  `doc/open-issues.txt` (implementation only with D's approval);
 - method lessons that apply to other puzzles: added to this file, or to
   `doc/solving-advisor.md` when they concern engine-based solving.
 

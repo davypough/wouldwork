@@ -1,4 +1,4 @@
-;;; Optional supplied-arrangement diagnostic (T34, specification 6.2).
+;;; Optional supplied-arrangement diagnostic RA (doc/talos-diagnostics.md, RA).
 ;;; Load after constraint-profile.lisp. Not an ASDF component or include-tech.
 ;;; Plain Common Lisp, callees first, no problem identities, no actions/search.
 (in-package :ww)
@@ -114,9 +114,9 @@
     (arrangement-check-bijective-indexes state)
     (arrangement-check-functional-facts facts)
     (arrangement-check-dependency-cycles facts)
-    (check-init-object-placement-consistency literals)
+    (funcall (symbol-function 'check-init-object-placement-consistency) literals)
     (when (find 'mounted-on facts :key #'first)
-      (check-init-mounted-fan-consistency literals))
+      (funcall (symbol-function 'check-init-mounted-fan-consistency) literals))
     (arrangement-check-presence facts mappings phase)
     (arrangement-check-support-policy state facts)
     (arrangement-check-pairings state facts mappings)

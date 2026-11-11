@@ -6,7 +6,7 @@ recurring one: "I set this at the REPL, then loaded a problem, and it reverted �
 
 Citations name files and functions, not line numbers.
 
-Source-checked on 2026-10-02. Filenames below assume the default instance. With
+Source-checked on 2026-11-10. Filenames below assume the default instance. With
 `WOULDWORK_INSTANCE` set before SBCL starts, generated files are
 `src/problem-<instance>.lisp` and `vals-<instance>.lisp` instead.
 
@@ -53,7 +53,7 @@ effect until `vals.lisp` is discarded or re-saved.
 
 ## What `vals.lisp` persists
 
-`save-globals` and `read-globals` (`ww-interface.lisp`) write and read a single 16-element list.
+`save-globals` and `read-globals` (`ww-interface.lisp`) write and read a single 17-element list.
 Position matters — `read-init-vals` indexes into it directly.
 
 | Pos | Parameter | Default |
@@ -74,6 +74,7 @@ Position matters — `read-init-vals` indexes into it directly.
 | 13 | `*threads*` | `0` |
 | 14 | `*max-recorder-cycles*` | `1` |
 | 15 | `*recorder-prefix-pruning*` | `nil` |
+| 16 | `*bt-cycle-check*` | `nil` |
 
 All managed defaults live in `*problem-parameter-defaults*`; the persisted subset and its
 save/read order live in `*persisted-problem-parameters*`. `*default-parameters*` is derived from
@@ -90,11 +91,13 @@ pads missing values, and truncates trailing values beyond the current registry.
 the default, omits them from `(params)`, and permits an exceptional problem override with
 `defparameter` after the corresponding `include-tech` form.
 
-Other non-persisted user settings include `*auto-wait*`, `*max-connector-pairings*`, and every parallel-search tuning
+The other non-persisted managed settings are `*progress-first-report*`, `*time-limit*`,
+`*auto-wait*`, `*failed-state-memory*`, `*max-connector-pairings*`,
+`*search-registers-dynamic-objects*`, `*worker-read-snapshots*` (described below), and every parallel-search tuning
 parameter — `*tasks-per-thread*`, `*min-tasks*`, `*split-depth-max*`,
 `*bound-refresh-interval*`, `*donation-check-interval*`, `*donation-threshold*`,
 `*donation-fraction*`, `*enable-work-donation*`, `*num-closed-shards*`. The non-persisted search
-settings call `save-globals`, which writes the 16-element list and omits them;
+settings call `save-globals`, which writes the 17-element list and omits them;
 the technology-specific settings only reprint the current parameters. Their REPL overrides survive a
 `(refresh)`, but not restaging or restart. Staging restores every managed default first and then
 applies the new problem specification's `ww-set` overrides.
@@ -117,24 +120,33 @@ refresh preserves what you set at the REPL. Its second act is `check-problem-par
 
 | Parameters | Settable in problem file? | Settable at REPL? | Effect of a REPL set |
 |---|---|---|---|
-| `*depth-cutoff*`, `*progress-reporting-interval*`, `*progress-first-report*`, `*randomize-search*`, `*branch*`, `*time-limit*`, `*auto-wait*`, `*tasks-per-thread*`, `*min-tasks*`, `*split-depth-max*`, `*bound-refresh-interval*`, `*donation-*`, `*enable-work-donation*`, `*max-recorder-cycles*`, `*recorder-prefix-pruning*` | yes | yes | `save-globals` + reprint |
+| `*depth-cutoff*`, `*progress-reporting-interval*`, `*progress-first-report*`, `*randomize-search*`, `*branch*`, `*time-limit*`, `*auto-wait*`, `*failed-state-memory*`, `*tasks-per-thread*`, `*min-tasks*`, `*split-depth-max*`, `*bound-refresh-interval*`, `*donation-*`, `*enable-work-donation*`, `*max-recorder-cycles*`, `*recorder-prefix-pruning*`, `*bt-cycle-check*` | yes | yes | `save-globals` + reprint |
 | `*worker-read-snapshots*` | yes | yes | assign + dedicated message; no persistence or reload |
-| `*max-connector-pairings*` | yes | yes | reprint only; a REPL override survives refresh but not restaging or restart; displayed only when beam-relay and connectors are present |
+| `*max-connector-pairings*`, `*search-registers-dynamic-objects*` | yes | yes | reprint only; a REPL override survives refresh but not restaging or restart; `*max-connector-pairings*` is displayed only when beam-relay and connectors are present |
 | `*solution-type*` | yes | yes | save + reprint; warns if `backtracking` is paired with an optimizing type |
 | `*num-closed-shards*` | yes | yes | save + reprint; also recomputes `*closed-shard-mask*` |
 | `*tree-or-graph*` | yes | yes | save + reprint; refuses `graph` under `backtracking` |
 | `*symmetry-pruning*` | yes | yes | **full `asdf:load-system :force t`** |
 | `*problem-type*` | yes | yes | **full reload** (plain `setf` when loading) |
 | `*debug*` | **no — errors** | yes | updates `:ww-debug`, then **full reload** |
-| `*algorithm*` | **no — errors** | yes | may force `*tree-or-graph*` to `tree`, then **full reload** |
+| `*algorithm*` | **only on a fresh stage** (no `vals.lisp`); otherwise ignored | yes | may force `*tree-or-graph*` to `tree`, then **full reload** |
 | `*probe*` | **no — errors** | yes | updates `:ww-debug`, zeroes `*debug*`, then **full reload** |
 | `*threads*` | yes | yes | saves; **full reload only when crossing the 0 ↔ non-zero boundary**, otherwise reprints |
 | `*problem-name*` | **yes — required here** | no — prints a refusal | — |
 
-The three erroring parameters — `*debug*`, `*algorithm*`, `*probe*` — are rejected in a problem file
+The two erroring parameters — `*debug*` and `*probe*` — are rejected in a problem file
 because each requires recompilation to take effect, and a problem file is read during the very
 compile they would need to influence. The error message tells you to set them at the REPL after
 staging.
+
+`*algorithm*` also governs translation, but a problem-file setting is accepted rather than
+rejected. It is assigned only when the saved settings file does not exist — that is, after
+`(stage ...)` or `(ww-reset)`, both of which delete it first — and the assignment happens as the
+problem file loads, ahead of the action translations that depend on it. On any other load,
+`read-init-vals` has already restored the saved value, which the problem's actions are about to
+be translated with, so the problem-file form is silently ignored and the saved value stands. The
+`backtracking`/`graph` adjustment that a REPL set makes immediately is left to `init()` in this
+case.
 
 `*threads*` is the mirror image: crossing the 0 boundary changes the `:synchronized` flag on every
 thread-sensitive global hash table and the atomic-vs-plain expansion of `increment-global`, `push-global`, and
@@ -200,7 +212,7 @@ it."**
 Working as designed. `(refresh)` skips problem-file `ww-set` forms; `(stage)` applies them.
 
 **"I tuned `*tasks-per-thread*`, restarted SBCL, and it's back to default."**
-It isn't in the 16-element `vals.lisp` list. Nothing outside that list is saved there.
+It isn't in the 17-element `vals.lisp` list. Nothing outside that list is saved there.
 
 **"Setting `*threads*` reloaded the whole system."**
 Only because the value crossed 0. Within either regime it is a plain assignment.

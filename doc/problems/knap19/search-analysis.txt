@@ -68,3 +68,10 @@ without the bound) and the closed table.  With knap19's strong bound the saving 
 (24 states), since the bound already assumed the order; it matters where the bound prunes
 little (knap30: factor of 2) and as packings grow larger.  The general engine version
 (sleep sets over each action's read and write facts) remains proposed.
+
+2026-11-10  Consolidation
+-------------------------
+problem-knap19-1.lisp (ascending puts, tree search) replaced problem-knap19.lisp under the
+name knap19; the unordered graph-search spec was retired.  The knap19-1 runs above are now
+knap19.  (test) still finds worth 12,248 with items 3 5 6 9 11; its recorded final state was
+updated because the in relation no longer exists.

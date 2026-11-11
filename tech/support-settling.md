@@ -51,7 +51,7 @@ and the existing blower landing queries/updates extracted from `-gears-fan`.
 selection and the release batch. Blower selection retains its original support kinds,
 category order and optional exact-height constraint, and excludes dependency cycles.
 
-`test/problem-support-settling-test.lisp` exercises real tray-release successors, beam
+`test/talos/problem-support-settling-test.lisp` exercises real tray-release successors, beam
 clearance and pairings, recorder layers, lower stacks, ground fallback, ordinary movement,
 remote release, ambiguity, capacity and cycle exclusions, and cancellation. Existing
 tray, box, jump, ladder, step, blower and recorder fixtures cover shared-mechanism regressions.
@@ -76,6 +76,6 @@ No Crelay solve, subgoal search, or solution/recorder replay was run.
 To rerun the focused characterization after loading Wouldwork:
 
 ```lisp
-(stage "test/problem-support-settling-test.lisp")
+(stage "test/talos/problem-support-settling-test.lisp")
 (run-test-claims)
 ```

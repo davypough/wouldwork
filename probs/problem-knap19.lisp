@@ -1,8 +1,24 @@
-;;;; Filename: problem-knap19.lisp
+;;; Filename: problem-knap19.lisp
 
-;;; Problem specification for a 19-item knapsack problem.
-;;; Same rules as problem-knap19.lisp, with the item data read by ordinary load-time
-;;; forms instead of read-time #. forms, and the bound computed in one query.
+;;; Problem specification for a 19-item knapsack problem, items packed in ascending order.
+
+;;; Design notes
+;;; - Independent moves in a canonical order.  Packing two different items gives the same
+;;;   knapsack in either order, and if both orders fit, every intermediate load fits too.
+;;;   So each item may be packed only if it is numbered above every item already packed.
+;;;   Every packing is still reachable, but now by exactly one sequence of moves.
+;;; - Tree search.  With one path per packing no state is ever reached twice, so a closed
+;;;   table would only cost memory (and, with threads, a shared lock).  Unordered puts under
+;;;   graph search generate each packing of k items from each of its k parents and discard
+;;;   all but one against the closed table (about 6 times the successors here).
+;;; - An optimistic bound.  Items are numbered by decreasing value/weight; the bound fills
+;;;   the remaining capacity greedily with items above the largest packed one, allowing a
+;;;   fraction of the first that does not fit.  It assumes the same ascending order, which
+;;;   the put action enforces.
+;;; - A lean state: the packed items as a sorted list, plus the running load and worth.
+;;; - Measured 2026-10-15 against unordered puts with graph search: the same 432 program
+;;;   cycles with the bound; without it 36,326 states processed against 231,159
+;;;   (doc/problems/knap19/search-analysis.txt).
 
 
 (in-package :ww)  ;required
@@ -12,7 +28,7 @@
 
 (ww-set *problem-type* planning)
 
-(ww-set *tree-or-graph* graph)
+(ww-set *tree-or-graph* tree)
 
 (ww-set *solution-type* max-value)
 
@@ -39,8 +55,7 @@
 
 
 (define-dynamic-relations
-  (in item-id)  ;an item-id in the knapsack
-  (contents $list)  ;the item-ids in the knapsack
+  (contents $list)  ;the item-ids in the knapsack, ascending
   (load $fixnum)  ;the net weight of the knapsack
   (worth $fixnum))  ;the net worth of item-ids in the knapsack
 
@@ -76,17 +91,15 @@
 (define-action put
     1
   (?item-id item-id)
-  (and (not (in ?item-id))
+  (and (bind (contents $item-ids))
+       (> ?item-id (or (car (last $item-ids)) 0))
        (bind (weight ?item-id $item-weight))
        (bind (load $load))
        (assign $new-load (+ $load $item-weight))
        (bind (capacity $capacity))
        (<= $new-load $capacity))
   (?item-id)
-  (assert (in ?item-id)
-          (bind (contents $item-ids))
-          (assign $new-item-ids
-            (merge 'list (list ?item-id) (copy-list $item-ids) #'<))
+  (assert (assign $new-item-ids (append $item-ids (list ?item-id)))
           (contents $new-item-ids)
           (load $new-load)
           (bind (worth $worth))

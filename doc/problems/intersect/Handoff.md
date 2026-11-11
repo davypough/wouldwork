@@ -28,5 +28,5 @@ take (action-sequence-validation-final-state *accepted-validation*).
 ## Open items
 - No static profile on file (the stale one was removed); regenerate if needed.
 - The diagram does not show location10, location11 (D's drawing).
-- 999-object limit: Schema-Gaps.txt, NEED of 2026-11-10 (open).
-- Engine/game differences found in play: Schema-Gaps.txt, NEEDs of 2026-11-09 and 2026-11-10.
+- 999-object limit: doc/open-issues.txt, NEED of 2026-11-10 (open).
+- Engine/game differences found in play: doc/open-issues.txt, NEEDs of 2026-11-09 and 2026-11-10.

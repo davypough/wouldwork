@@ -7,9 +7,15 @@ This is **heuristic-ordered depth-first search**. The heuristic sorts successors
 **Serial and parallel depth-first search both use heuristics.** `generate-children` in
 `ww-planner.lisp` computes scores. `search-serial` in `ww-searcher.lisp` and the task-generation
 and worker loops in `ww-parallel.lisp` order successors using those scores. Parallel execution
-does not preserve the serial visitation order. Backtracking does not consult `heuristic?`.
+does not preserve the serial visitation order.
 
-Source-checked on 2026-10-02; no performance runs were made for this review.
+**Backtracking uses heuristics too.** When `heuristic?` is defined, `visit-choices-in-order-bt`
+(`ww-backtracker.lisp`) scores every choice at a level on a disposable copy of the working state
+(`ordered-choices-bt`) and explores them in stable ascending order; otherwise it streams choices
+in generation order without scoring. Serial and parallel backtracking share this path, so the
+scoring cost is paid once per expanded level in either.
+
+Source-checked on 2026-11-10; no performance runs were made for this review.
 
 See Manual Part 3, "Heuristic Search," for the mechanism. What follows is applicability guidance.
 

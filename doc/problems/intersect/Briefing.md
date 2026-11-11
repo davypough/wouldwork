@@ -221,7 +221,7 @@ strip included, with any pairings).
 Gate passage while body-blocking (D, 2026-11-09): the engine lets agent1 walk through a
 gate held open only by its own body in a beam (SG2's location8 -> gate2 move); plates are
 already strict.  D keeps the engine as is for intersect; check other problems later
-(Schema-Gaps.txt, NEED of 2026-11-09).
+(doc/open-issues.txt, NEED of 2026-11-09).
 
 **Reanalysis (2026-11-10).**  Fresh premise review found P2 false: receiver3 is not lit
 only up x = 15.  The lower room includes the strip west of wall2 and the cell between
@@ -261,7 +261,7 @@ The 40-action plan reaches the sigil, with two differences from the engine's acc
    gate1 until connector2 lit and its receiver4 beam appeared, then stepped out; blue was
    then cut at the lower crossing and gate2 stayed open.
 2. Gate2 on the second exit.  The plan held gate2 open with agent1's body at location8 and
-   walked to the gate (the Schema-Gaps NEED of 2026-11-09).  A expected the game to close
+   walked to the gate (the open-issues NEED of 2026-11-09).  A expected the game to close
    gate2 once agent1 left the beam (not tested).  Step 14 was changed to select connector3,
    receiver4 and receiver2, and the same switch-over was used: gate2 then stayed open on
    its own.  The changed step also replays in the engine (cloud, 40 actions, success T, goal

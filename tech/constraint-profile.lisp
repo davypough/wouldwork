@@ -29,11 +29,11 @@
 ;;;
 ;;;   (report-cycle-plan-check <plan plist>)
 ;;;
-;;; T33 accepts a complete reference-state scenario; see specification 6.1:
+;;; RC accepts a complete reference-state scenario; see talos-diagnostics.md, RC, supplied relay views:
 ;;;   (report-relay-view-scenario scenario)
-;;; EQ reads one settled state's removable fans and mounts; see specification 8.12:
+;;; EQ reads one settled state's removable fans and mounts; see talos-diagnostics.md, EQ:
 ;;;   (report-equipment-scenario (list :state <state> :provenance "<text>"))
-;;; SW compares the services of two settled states; see specification 8.13:
+;;; SW compares the services of two settled states; see talos-diagnostics.md, SD and SW:
 ;;;   (report-service-transition (list :before <state> :before-provenance "<text>"
 ;;;                                    :state <state> :provenance "<text>"))
 ;;; RC, NH and the whole-profile reporter take the same optional scenario. The writer
@@ -64,7 +64,7 @@
 ;;; rows the coordinate derivation supplies are a transitive closure and not an adjacency
 ;;; list.  S0, the type extent census, is not in section 3 of crelay-topo's
 ;;; Constraint-Prediction-Register.txt (archive removed 2026-10-02; in git history):
-;;; it closes G2 of doc/constraint-led-solving/Schema-Gaps.txt and runs
+;;; it closes G2 of the schema-gap register (doc/open-issues.txt; G2 in git history) and runs
 ;;; as step 0, since every later extractor needs the emptiness facts before it may read a
 ;;; control aggregate as an axiom.  S4 adds the qualified cut-keeper table under the
 ;;; approved interpretation in register 7.23.  RO, the role-obligation analysis, adds
@@ -74,8 +74,8 @@
 ;;; S5-S7, T6, RC, MC (mechanic coverage, T19), CC (coupling census, T20) and NH (necessity
 ;;; hints, T21) followed, then FH (from here, T22) and CP (cycle-plan check, T24), which are
 ;;; not run by the whole-profile reporter.  SD (services and setup dependencies, T43) closes
-;;; the profile; its SW transition check is not run by it.  The component index is in
-;;; doc/constraint-led-solving/Extractor-Specifications.md.
+;;; the profile; its SW transition check is not run by it.  The component reference is
+;;; doc/talos-diagnostics.md.
 
 (in-package :ww)
 
@@ -3069,7 +3069,7 @@
 
 
 ;;;; T33 -- SUPPLIED RELAY VIEW SCENARIOS ;;;;
-;;; Specification 6.1. Queries only, on private copies; no settling or search.
+;;; Specification: doc/talos-diagnostics.md, RC, supplied relay views. Queries only, on private copies; no settling or search.
 
 (defun relay-view-call (name state &rest arguments)
   (apply (symbol-function name) state arguments))
@@ -3975,7 +3975,7 @@ counted as layer-blind roots."
 
 ;;;; BX -- BEAM CROSSINGS AND CUT ORDER (T40) ;;;;
 ;;;
-;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 8.10.  The
+;;; Specification: doc/talos-diagnostics.md, BX.  The
 ;;; static rows read the engine's own crossing data: the published pool, each directed
 ;;; beam's stored crossing order and each gate's split of that order.  They name possible
 ;;; crossings only.  The supplied-state scenario evaluates one settled state with the
@@ -4073,9 +4073,12 @@ counted as layer-blind roots."
     (let* ((state *start-state*)
            (positions (funcall (symbol-function 'beam-coordinates-endpoint-positions) state))
            (beams (funcall (symbol-function 'beam-coordinates-potential-beams) state)))
-      (loop for (crossing beam parameter) in (beam-coordinates-crossing-records beams positions pool)
-            collect (let ((start (beam-coordinates-position (first beam) positions))
-                          (end (beam-coordinates-position (second beam) positions)))
+      (loop for (crossing beam parameter)
+              in (funcall (symbol-function 'beam-coordinates-crossing-records) beams positions pool)
+            collect (let ((start (funcall (symbol-function 'beam-coordinates-position)
+                                          (first beam) positions))
+                          (end (funcall (symbol-function 'beam-coordinates-position)
+                                        (second beam) positions)))
                       (list crossing
                             (+ (first start) (* parameter (- (first end) (first start))))
                             (+ (second start) (* parameter (- (second end) (second start))))))))))
@@ -4170,7 +4173,7 @@ counted as layer-blind roots."
           ((state-is-inconsistent state) "state marked inconsistent")
           ((not (member 'propagate-changes! *update-names*)) "propagation unavailable")
           ((not (crossing-settled-p state))
-           "state is not a propagation fixed point; supply a replayed state or settle it first (section 6.2)"))))
+           "state is not a propagation fixed point; supply a replayed state or settle it first (see RA in doc/talos-diagnostics.md)"))))
 
 
 (defun crossing-live-direction (state from to lighting)
@@ -4325,7 +4328,7 @@ counted as layer-blind roots."
 
 ;;;; RL -- COMPETING COLORS AND CONNECTOR LINKS (T41) ;;;;
 ;;;
-;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 8.11.  The
+;;; Specification: doc/talos-diagnostics.md, RL.  The
 ;;; static rows state beam-relay's pools, start links and the hues each RC station can
 ;;; see directly.  The supplied-state scenario replays one settled state's lighting layer
 ;;; by layer through the engine's own link query and checks the replay against the
@@ -4473,7 +4476,7 @@ counted as layer-blind roots."
           ((state-is-inconsistent state) "state marked inconsistent")
           ((not (member 'propagate-changes! *update-names*)) "propagation unavailable")
           ((not (crossing-settled-p state))
-           "state is not a propagation fixed point; supply a replayed state or settle it first (section 6.2)"))))
+           "state is not a propagation fixed point; supply a replayed state or settle it first (see RA in doc/talos-diagnostics.md)"))))
 
 
 (defun relay-light-anchor (state selector relay)
@@ -4821,7 +4824,7 @@ counted as layer-blind roots."
 
 ;;;; MC -- MECHANIC COVERAGE (T19, I5) ;;;;
 ;;;
-;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 8.  The Phase 0
+;;; Specification: doc/talos-diagnostics.md, MC.  The Phase 0
 ;;; coverage gate: which public technologies the staged problem splices, and which of them
 ;;; carry a declared static contract.  The whole-profile reporter prints it first, but it
 ;;; sits here, after every block it reads, because this file is ordered callees-first.
@@ -4831,7 +4834,7 @@ counted as layer-blind roots."
 ;;; and CONTROLS, and the settings *VERTICAL-REACH-LIMIT* and *MAX-RECORDER-CYCLES* are named:
 ;;; each is a tech/ interface, and a contract is by definition a statement about one
 ;;; technology.  No problem object name appears; every instance comes from the staged
-;;; databases.  T28 (section 8.7) added the jump and recorder contracts and the step entry.
+;;; databases.
 
 
 (defparameter *mechanic-contracts*
@@ -4890,8 +4893,8 @@ counted as layer-blind roots."
      "its CONTROLS aggregate (uncontrolled default on), unless jammed; a fan must be present. Live objects read TURNING, ghosts read RECORDING-TURNING; the two views need not agree"
      "horizontal sweep from HAS-POSITION to AIMED-AT when base < stream <= top; detach from support, relocate the occupant and its stack, with held cargo following its agent; land on a flush-floor support or ground. Pairing and jamming facts persist, effects recomputed at the destination"
      "own-view fan activity and body contact with the stream; fans are never swept. Wall-mounted fans have no HAS-LOCATION and are not standing supports. Walk-kind clauses naming the drive require it inactive in the actor's view. Directly unswept bodies may still move with swept supports; transport cycles must converge"))
-  "The contract registry, one entry per public technology name, section 8.3 of the
-   specification.  An entry is (NAME KIND NOTE) for KIND :EXTRACTORS, whose NOTE names the
+  "The contract registry, one entry per public technology name, see talos-diagnostics.md,
+   MC.  An entry is (NAME KIND NOTE) for KIND :EXTRACTORS, whose NOTE names the
    components that already carry the technology's static consequences, and for
    :INFRASTRUCTURE, whose NOTE says what the technology supplies instead of a constraint.
    A :CONTRACT entry adds its instance reporter and its three contract texts, (NAME
@@ -5391,7 +5394,7 @@ counted as layer-blind roots."
 
 ;;;; CC -- COUPLING CENSUS (T20, I3) ;;;;
 ;;;
-;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 9.  Which
+;;; Specification: doc/talos-diagnostics.md, CC.  Which
 ;;; controls or devices change two subsystems at once: a role table over every controlled
 ;;; device and primitive controller, fan-out primitives (K1), multi-role objects (K2), the
 ;;; gates that can cut a beam-driven controller's last hop (K3), and lift-barrier couplings
@@ -5697,7 +5700,7 @@ counted as layer-blind roots."
 
 ;;;; EQ -- REMOVABLE EQUIPMENT IN ONE SUPPLIED STATE (T42) ;;;;
 ;;;
-;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 8.12.  One
+;;; Specification: doc/talos-diagnostics.md, EQ.  One
 ;;; settled state's fans, mounts, boarding, mounting, removal and lifts, read with the
 ;;; engine's own queries and checked against its successor generator; optionally the
 ;;; differences from an earlier settled state.  Not part of the profile.  The caller's states
@@ -5716,7 +5719,7 @@ counted as layer-blind roots."
          (format nil "~A: state provenance missing" label))
         ((state-is-inconsistent state) (format nil "~A: state marked inconsistent" label))
         ((not (crossing-settled-p state))
-         (format nil "~A: state is not a propagation fixed point; supply a replayed state or settle it first (section 6.2)"
+         (format nil "~A: state is not a propagation fixed point; supply a replayed state or settle it first (see RA in doc/talos-diagnostics.md)"
                  label))))
 
 
@@ -6084,7 +6087,7 @@ counted as layer-blind roots."
 
 ;;;; NH -- NECESSITY HINTS (T21, I6) ;;;;
 ;;;
-;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 10.  Each static
+;;; Specification: doc/talos-diagnostics.md, NH.  Each static
 ;;; limit another section already states, restated as a candidate plan element for the
 ;;; Briefing: H1 body budget (T6), H2 keepers left behind (S4), H3 beam-held devices and
 ;;; candidate beams (S1, RC), H4 controllers off the goal route (S4, S3), H5 lift landings
@@ -6101,7 +6104,7 @@ counted as layer-blind roots."
 (defparameter *hint-family-titles*
   '("body budget" "keepers left behind" "beam-held devices" "controllers off the goal route"
     "lift landings" "active at the start" "placement limits")
-  "The seven NH family titles, in print order, section 10.3 of the specification.")
+  "The seven NH family titles, in print order (talos-diagnostics.md, NH).")
 
 
 (defun hint-goal-routes (names spine devices)
@@ -6702,7 +6705,7 @@ counted as layer-blind roots."
 
 ;;;; SD -- SERVICES AND SETUP DEPENDENCIES (T43) ;;;;
 ;;;
-;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 8.13.  A service
+;;; Specification: doc/talos-diagnostics.md, SD and SW.  A service
 ;;; is a condition a crossing or the goal needs: a gate open, a drive named by a traversal
 ;;; clause not blowing, a receiver active.  Each has providers (S1 CONTROL options, MC jam
 ;;; sites, gears left without a fan, RC chains and fixed corridors to a receiver), each a
@@ -7370,7 +7373,7 @@ counted as layer-blind roots."
 
 ;;;; SW -- SERVICE TRANSITION BETWEEN TWO SUPPLIED STATES (T43) ;;;;
 ;;;
-;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 8.13.  What changes
+;;; Specification: doc/talos-diagnostics.md, SD and SW.  What changes
 ;;; between two settled states: each passage service kept, kept by an alternative provider,
 ;;; lost or gained; the supplies withdrawn and added and the devices they drive; the arcs,
 ;;; mobility and retrieval an agent loses or gains; and stated transit, return and final
@@ -7656,7 +7659,7 @@ counted as layer-blind roots."
 
 ;;;; FH -- FROM HERE (T22, I1) ;;;;
 ;;;
-;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 11.  The Phase 3
+;;; Specification: doc/talos-diagnostics.md, FH.  The Phase 3
 ;;; step 7 report at one state: F0 the state itself; F1 each agent's MOVE successors, and
 ;;; which primitive controllers a one-step successor, or the agent's own next action after
 ;;; one of its moves, changes; F2 where held cargo can be set down; F3 the live relay state,
@@ -8138,7 +8141,7 @@ counted as layer-blind roots."
 
 ;;;; CP -- CYCLE-PLAN CHECK (T24, I2) ;;;;
 ;;;
-;;; Specification: doc/constraint-led-solving/Extractor-Specifications.md section 13.  Checks a
+;;; Specification: doc/talos-diagnostics.md, CP.  Checks a
 ;;; stage plan the user states, as data, against the plate, body and view budgets before any
 ;;; action is written: B0 view, B1 plate budget (RO's matching), B2 control conflict (S1), B3
 ;;; beam (RC), B4 lift landing (CC's G15 rows).  No search runs and no state is evaluated.  CP
@@ -8152,7 +8155,7 @@ counted as layer-blind roots."
 ;;; this file's own.  No problem object name appears; every
 ;;; device, body, plate and segment comes from the staged databases or from the plan.
 ;;;
-;;; T44 (section 13.8) adds a stage's :RESERVATIONS: roles a caller assigns to bodies over a
+;;; CP reservations (talos-diagnostics.md, CP) add a stage's :RESERVATIONS: roles a caller assigns to bodies over a
 ;;; phase range.  B5 checks each body's roles for compatibility, the supports, holders and
 ;;; gears they share, the eligible pool and releases; B1 then matches with per-plate
 ;;; eligibility.  The role rules read ON, HOLDING, JAMMING, MOUNTED-ON and HAS-LOCATION, the
@@ -8167,7 +8170,7 @@ counted as layer-blind roots."
   '((0 . "grade 1; S2") (1 . "grade 1 -> 2; S1 S2 RO") (2 . "grade 1; S1")
     (3 . "grade 2; S1 RC") (4 . "grade 1; CC")
     (5 . "grade 1 -> 2; S2 roles, functional keys, MC jammer survey"))
-  "Each family's grade and sources, section 13.4 of the specification.")
+  "Each family's grade and sources (talos-diagnostics.md, CP).")
 
 
 (defun cycle-plan-worst-label (labels)
@@ -8237,7 +8240,7 @@ counted as layer-blind roots."
 
 
 (defun cycle-plan-eligible-p (body segment context)
-  "Whether BODY counts on a plate in SEGMENT's view (section 13.3): in the physical view every
+  "Whether BODY counts on a plate in SEGMENT's view (talos-diagnostics.md, CP): in the physical view every
    body present, ghosts only when present; in the recording view ghosts only, in an open cycle."
   (let ((class (census-layer-class body (getf context :pairs))))
     (if (eq (getf segment :view) :recording)
@@ -8410,7 +8413,7 @@ counted as layer-blind roots."
 (defun cycle-plan-reservation-spans (stage)
   "Each of STAGE's reservations with the indices of the first and last segment it covers, as
    (reservation from through); by default the whole stage.  An unknown role, a phase naming no
-   segment of STAGE, or a phase ending before it begins signals an error (section 13.8)."
+   segment of STAGE, or a phase ending before it begins signals an error (talos-diagnostics.md, CP, reservations)."
   (let ((ids (mapcar (lambda (segment) (getf segment :id)) (getf stage :segments))))
     (loop for reservation in (getf stage :reservations)
           for from = (if (getf reservation :from)
@@ -8497,7 +8500,7 @@ counted as layer-blind roots."
 
 
 (defun cycle-plan-body-conflicts (body roles context)
-  "C1-C7 for BODY's ROLES in one segment (section 13.8), as texts in rule order; NIL when the
+  "C1-C7 for BODY's ROLES in one segment (talos-diagnostics.md, CP, reservations), as texts in rule order; NIL when the
    roles are compatible."
   (let* ((kinds (mapcar #'first roles))
          (tray (member body (census-type-instances 'tray)))
@@ -8587,7 +8590,7 @@ counted as layer-blind roots."
 
 
 (defun cycle-plan-plate-eligibility (body roles plate segment context)
-  "Whether reserved BODY, committed to ROLES, may also weight PLATE (section 13.8): eligible in
+  "Whether reserved BODY, committed to ROLES, may also weight PLATE (talos-diagnostics.md, CP, reservations): eligible in
    the view, the roles with (:WEIGHT PLATE) added compatible, and no jam sightline refuted from
    PLATE.  Returns (values eligible premises), the premises being the jam results' texts."
   (let ((extended (cons (list :weight plate) roles)))
@@ -8622,7 +8625,7 @@ counted as layer-blind roots."
 (defun cycle-plan-plate-rows (segment demands active context)
   "B1 rows for the required plates, in plate name order: a pinned plate by its holders, the
    rest matched injectively with RO's allocation to the free witnesses and to the reserved
-   bodies whose roles admit that plate (section 13.8); then a CONFLICT for each plate
+   bodies whose roles admit that plate (talos-diagnostics.md, CP, reservations); then a CONFLICT for each plate
    demanded empty that is held or also required."
   (let* ((required (remove-if-not (lambda (demand)
                                     (and (eq :plate (cycle-plan-primitive-kind (first demand) context))
@@ -8849,7 +8852,7 @@ counted as layer-blind roots."
 
 
 (defun cycle-plan-reservation-rows (segment previous demands active released context)
-  "B5 for SEGMENT (section 13.8): a row per reserved body, the capacity rows, the pool rows,
+  "B5 for SEGMENT (talos-diagnostics.md, CP, reservations): a row per reserved body, the capacity rows, the pool rows,
    then a row per reservation RELEASED after PREVIOUS.  A release is not simultaneous
    availability: the body counts here only as SEGMENT states it."
   (let* ((commitments (cycle-plan-commitments segment active))
@@ -8929,7 +8932,7 @@ counted as layer-blind roots."
 
 
 (defun report-cycle-plan-check (plan)
-  "CP, grade per row.  Checks PLAN, a stage plan stated as data (section 13.2), against the
+  "CP, grade per row.  Checks PLAN, a stage plan stated as data (talos-diagnostics.md, CP), against the
    plate, body and view budgets: B0 view, B1 plate budget, B2 control conflict, B3 beam, B4
    lift landing.  A PASS is not a plan witness; a CONFLICT rejects the stated budget only."
   (let* ((*print-pretty* nil)

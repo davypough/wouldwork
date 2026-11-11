@@ -1,7 +1,6 @@
 ;;; Filename: constraint-probe-battery.lisp
 
-;;; PB -- PROBE BATTERY (T23, I7).  Specification: doc/constraint-led-solving/Extractor-Specifications.md
-;;; section 12.  Small searches from the staged start, one per landmark or resource, deepening
+;;; PB -- PROBE BATTERY.  Specification: doc/talos-diagnostics.md, PB.  Small searches from the staged start, one per landmark or resource, deepening
 ;;; one cutoff at a time to the problem's maximum depth: P1 an agent at a landmark location, P2
 ;;; cargo set down outside its start region, P3 a primitive controller changed from its start
 ;;; reading, P4 a fixed relay paired with a connector; and P5, D's own probes (T29, section
@@ -27,7 +26,7 @@
 (in-package :ww)
 
 
-;;;; Generator (spec 12.2) ;;;;
+;;;; Generator (talos-diagnostics.md, PB) ;;;;
 
 
 (defun probe-landmark-locations (controls names static)
@@ -95,7 +94,7 @@
 
 
 (defun probe-battery-probes ()
-  "Every probe of the staged problem in family order (spec 12.2), each a plist with :ID
+  "Every probe of the staged problem in family order (talos-diagnostics.md, PB), each a plist with :ID
    (P<family>.<index>), :FAMILY, :SUBJECT and :GOAL."
   (let* ((controls (control-facts))
          (context (hint-route-context controls))
@@ -113,7 +112,7 @@
                                       probe)))))
 
 
-;;;; P5 -- D's own probes (spec 12.8, T29) ;;;;
+;;;; P5 -- D's own probes ;;;;
 
 
 (defparameter *probe-goal-connectives* '(and or not)
@@ -153,7 +152,7 @@
 
 
 (defun d-probes (entries)
-  "P5, D's own probes (spec 12.8): one probe per entry (SUBJECT GOAL PROVENANCE), numbered
+  "P5, D's own probes (talos-diagnostics.md, PB): one probe per entry (SUBJECT GOAL PROVENANCE), numbered
    P5.1 ... in entry order.  Every entry is checked first, so a bad one signals before any
    search.  Run them with (run-probe-battery max-depth pathname (d-probes ...)),
    alone or appended to (probe-battery-probes)."
@@ -165,7 +164,7 @@
                       :goal (second entry) :provenance (third entry))))
 
 
-;;;; Runner (spec 12.3, 12.4) ;;;;
+;;;; Runner (talos-diagnostics.md, PB) ;;;;
 
 
 (defun probe-goal-holds-at-start-p (goal checkpoint)
@@ -231,13 +230,13 @@
   pathname)
 
 
-;;;; Reporter (spec 12.5) ;;;;
+;;;; Reporter (talos-diagnostics.md, PB) ;;;;
 
 
 (defparameter *probe-family-titles*
   '("landmark" "resource" "controller" "relay" "D's own")
-  "The five PB family titles, in print order: P1-P4 of section 12.2 of the specification,
-   and P5, D's own probes, of section 12.8.")
+  "The five PB family titles, in print order: P1-P4, then P5, D's own probes
+   (talos-diagnostics.md, PB).")
 
 
 (defun read-probe-battery-results (pathname)
@@ -249,7 +248,7 @@
 
 
 (defun probe-label-text (record max-depth)
-  "RECORD's label with its numbers and grade (spec 12.4), and the last run's states."
+  "RECORD's label with its numbers and grade (talos-diagnostics.md, PB), and the last run's states."
   (let ((last (car (last (getf record :runs)))))
     (format nil "~A~@[; states ~:D at the last cutoff~]"
             (ecase (getf record :label)
@@ -296,7 +295,7 @@
 
 
 (defun report-probe-battery-list (&optional (probes (probe-battery-probes)))
-  "PROBES, by family, without searching (spec 12.2); by default the staged problem's P1-P4.
+  "PROBES, by family, without searching (talos-diagnostics.md, PB); by default the staged problem's P1-P4.
    Pass (append (probe-battery-probes) (d-probes ...)) to list D's own probes too."
   (let ((*print-pretty* nil))
     (format t "~2%PB  PROBE BATTERY -- probe list, no search~%")
@@ -315,7 +314,7 @@
 
 
 (defun run-probe-battery (max-depth pathname &optional (probes (probe-battery-probes)))
-  "PB's searches (spec 12.3): each of PROBES from the fresh staging's checkpoint, deepening
+  "PB's searches (talos-diagnostics.md, PB): each of PROBES from the fresh staging's checkpoint, deepening
    to non-negative MAX-DEPTH. Requires *THREADS* 16. PATHNAME is
    rewritten after every probe, so a crash keeps the probes already finished.  The staged
    start, goal, undo stack, depth cutoff and solution type are restored however it ends."
@@ -348,7 +347,7 @@
 
 
 (defun report-probe-battery (pathname)
-  "PB, grade per row (spec 12.5), printed from the results file at PATHNAME; no search."
+  "PB, grade per row (talos-diagnostics.md, PB), printed from the results file at PATHNAME; no search."
   (let* ((*print-pretty* nil)
          (results (read-probe-battery-results pathname))
          (settings (getf results :settings)))

@@ -1,7 +1,7 @@
 # Parallel search: default worker-owned reads
 
-2026-09-14: Approved integration and generalization are complete. Ordinary
-staging and solving remain the user workflow.
+Worker-owned read views for parallel depth-first and backtracking search. Source-checked
+2026-11-10. Ordinary staging and solving remain the user workflow.
 
 ## Ordinary use
 
@@ -23,10 +23,8 @@ cycle-check mode, uses the same worker views.
 
 The retained serial selector optimization, worker-owned static facts/object-code
 maps, and cold worker-private traversal dependency caches are integrated.
-The current source also registers traversal segment caches as worker-private.
-Worker memo tables are created unsynchronized because each belongs to one worker.
-This supersedes the original integration's shared segment-cache policy; it does
-not establish the performance effect of that later change.
+Traversal segment caches are also worker-private. Worker memo tables are created
+unsynchronized because each belongs to one worker.
 
 For an explicit diagnostic comparison, WW-SET can disable WORKER-READ-SNAPSHOTS.
 REFRESH retains the current setting; STAGE restores the enabled default. The flag
@@ -34,8 +32,8 @@ does not increase the configured worker count or change the search objective.
 
 ## Ownership follows the loaded technology
 
-The experiment's Claustro/Corner name checks, specific objective/mode whitelist,
-and blanket callback/happening exclusions are removed. The engine creates views
+There are no problem-name checks, objective/mode whitelists, or blanket
+callback/happening exclusions. The engine creates views
 for parallel depth-first and backtracking worker groups regardless of problem name, planning/CSP,
 tree/graph or solution objective. Existing engine constraints still apply, such
 as serial automatic waiting; snapshots do not turn a
@@ -78,6 +76,10 @@ The coordinator verifies static facts, both code maps, the bijective canonical
 map, object index and stage generation at teardown. Registered configuration
 values are also compared. Every created worker is joined before releasing the
 phase, including preparation/startup errors, cancellation and nonlocal exits.
+
+The static copier accepts finite cons trees, strings and atomic values; arbitrary
+circular payloads, structures and general vectors are not silently shared.
+Dynamic fluents keep their ordinary engine copy semantics.
 
 Problem callbacks retain their ordinary engine contract: they must be safe to
 call concurrently and must not modify static facts or register new apparatus
@@ -125,59 +127,14 @@ test, size/rehash settings and synchronization flag are preserved. Registration
 itself is rejected during the frozen phase. Traversal parameter registration
 also registers the parameter value for configuration verification.
 
-## Staging corrections discovered by the repository sweep
-
-- Problem-file worker-count declarations no longer trigger a nested ASDF load.
-  STAGE completes a second compilation pass when the declared count changes the
-  serial/worker compilation mode. Explicit worker-count overrides and REFRESH
-  retain their settings; QueensN-CSP was the regression case.
-- Persisted goals now encode cons/hash-table data instead of writing unreadable
-  hash-table object descriptions. The positional VALS layout and early startup
-  fields remain unchanged; older ordinary goal entries still load. Tiles1b
-  stages, changes worker count and refreshes with its hash-table goal intact.
-- The fluent-type validator accepts atomic dotted tails in destructuring
-  patterns. Tiles2a-Heuristic now stages with its existing coordinate bindings.
-
-## Validation and retained evidence
-
-New evidence was under artifacts/parallel-closeout-01 (directory removed by D
-by 2026-09-28). Runs used isolated SBCL
-processes, unique instance files and fresh ASDF caches. The user's REPL was not
-used. No TEST-THREADS invocation or expensive puzzle solve was run.
-
-| Check | Result / evidence |
-| --- | --- |
-| All 192 repository problem files (76 problems, 116 tests) | Initial STAGE/snapshot-copy sweep passed 188. Targeted retests resolved QueensN-CSP and both tile cases. Buzzer1 stages with default snapshots enabled in its existing serial automatic-wait mode; its explicit-wait diagnostic also passes snapshot ownership and two-worker expansion. See result-sweep-01.txt, sweep-01-results.sexp and result-staging-03.txt. |
-| 16 representative two-worker start expansions | Complete successor/state/HIDB/happening comparisons with standard and canonical hashes passed, including recorder, heuristics, callbacks, all four major Topo puzzles, mobility and blowers. Repeated on final source: result-behavior-final.txt. These are bounded expansions, not full solves. |
-| Claustro and Corner complete bounded movement/successor comparisons | Installed memo policy passed at 1/2/4 workers, including paranoid cache verification. See result-lazy-and-full-01.txt. Its later lazy-cache return-value harness check failed; corrected cache-content checks passed in result-lazy-02.txt. |
-| Cold crossing and lower-bound model construction | Two workers match coordinator results while leaving coordinator memo bindings unchanged: result-lazy-02.txt. |
-| Copy ownership, write/registration guards, missing codes and lifecycle failures | Final focused suite passed, including preparation/startup/worker/coordinator failures, cancellation and nonlocal exit: result-focused-final.txt. |
-| Hash-table dynamic fluents and recorder registration guards | Tiles1b two-worker expansion and goal round-trip passed using the ordinary dynamic-state copier; recorder registration is rejected during publication: result-ancillary-03.txt. |
-| Serial selector and settings transitions | Generated forms, presence values, stale-mode rejection, expected failed-compilation rejection, serial behavior, REFRESH retention and STAGE reset passed: result-selector-final.txt. |
-| Normal small solves | Serial Blocks3, two-worker Blocks3 and two-worker three-disk Hanoi solved and independently replayed; backtracking Blocks3 solved. Final-source repeat: result-small-solves-final.txt. Actual workers were forced with small root-task settings. |
-
-This establishes repository-wide staging/static-payload coverage and focused
-parallel behavior, not exhaustive solution verification for every problem.
-Future technologies must honor the registration and immutability contract.
-The static copier accepts finite cons trees, strings and atomic values; arbitrary
-circular payloads, structures and general vectors are not silently shared.
-Dynamic fluents keep their ordinary engine copy semantics.
-
-All prior serial-01, selector-01, selector-timing-01 and traversal-01 evidence,
-reference copies/worktrees and unrelated source changes remain preserved.
-
-The earlier measured gains remain scoped to their reports. In particular, the
-roughly 62-66% four-worker reduction in repeated traversal work is not a measured
-whole-search gain from this generalized default implementation. No expensive
-Claustro, Corner, Rumin or Crelay solve is included in this closeout validation.
-
 ## Search-time object registration
 
 Problems whose search actions or helpers call `register-dynamic-object` declare
 `(ww-set *search-registers-dynamic-objects* (beam))` in their specification, listing
 all object types registered during search. The error identifies these types. The
-declaration defaults to NIL on STAGE and survives REFRESH. Search entry rejects it when parallel
-DFS worker snapshots are enabled, before root-task generation. Use
+declaration defaults to NIL on STAGE and survives REFRESH. Search entry (`ww-solve`, via
+`validate-worker-read-snapshot-mode`) rejects it when worker snapshots are active for parallel
+depth-first or backtracking search, before root-task generation. Use
 `(ww-set *threads* 0)` for these problems. Disabling snapshots is not a validated
 parallel workaround.
 
