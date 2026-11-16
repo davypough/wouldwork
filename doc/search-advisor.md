@@ -371,7 +371,7 @@ of a result belong here.  The notes below the table give the details and measure
    in 0.4 s with symmetry pruning (both with a lower bound).
 7. **Deduced facts.**  A deduction is a claim, not a result: its value is a smaller search,
    its risk a missed case.  Ask of each what it would remove.  A fact the rules already
-   enforce removes nothing: corner-topo-advisor's "gate1 is closed in every goal state"
+   enforce removes nothing: corner-topo's "gate1 is closed in every goal state"
    follows from the rules, so as a goal filter it would drop none.  Section 3, note 10.
 
 ---
@@ -435,7 +435,7 @@ S14 = C5, S15 = B17.
 | C1 | **Relaxation** | Q14: propagation dominates and base facts approximate the derived ones | a separate spec whose preconditions ask a weaker, cheaper question; the goal calls `propagate-changes!` and tests the true conditions last | The cheap test must hold wherever the true one does, never the reverse.  No help when the difficulty is the number of choices |
 | C2 | **Backward search** | Q12 yes, a backward move is not just a forward move on a transformed state, and the backward branching is clearly smaller than the forward (D6) | the backward spec of C3, with the original start state as its goal, searched alone; reverse its plan, stage the forward spec and replay it (note 6) | As C3; a separate spec to keep consistent, checked as a re-encoding (section 1.1) |
 | C3 | **Bidirectional search** | Q12 yes: the goal can be written as explicit states and every move has an exact reverse, and depth is the obstacle | Two specs.  A backward spec starts from the goal state with the reversed moves and is searched with `every` to depth d2, its states saved with `(get-state-codes)`; the forward spec's goal calls `(backward-path-exists state)`, searched to d1 = d - d2.  Both need an identical `encode-state` (note 6) | A second spec to write and keep consistent; memory for the saved states; the joined plan is shortest only if no shorter total meets (note 6) |
-| C4 | **Enumerator meet-in-the-middle** | Q13 yes: goal states are described by base facts (positions, pairings) from which the derived facts follow, and depth is the obstacle.  Moves need not be reversible and goal states need not be written out | One spec plus enumerator declarations: `define-base-relation` for each base fact, with limits (optional `define-goal-filter`, `state-feasible?`); then `(find-goal-states)`, `(find-predecessors)` one layer at a time (each layer is saved; `load-predecessors` restores it in a fresh image and `find-predecessors` continues from the deepest layer), and `(solve-meeting-point :depth-cutoff N :solution-type min-length)` (note 8) | Goal states or backward layers can explode; constrain base relations early; a goal filter that writes in an expected answer narrows the search to it; `find-predecessors` runs on `*threads*` workers (checked); `find-goal-states` with threads not yet checked; except with `first` and `min-length`, the meeting search is exhaustive to its cutoff, so memory bounds the forward depth (note 8); confirm first that the backward step reproduces a known plan's last step (note 8); in Talos problems guessed predecessors are corrected (riders follow their carrier) and screened for physical consistency (2026-10-17), so layer counts recorded earlier include impossible states (corner-topo-advisor layer 1: 3,855 new before, 1,048 after); a single state's predecessors: `find-state-predecessors` (advisor-reference F23) |
+| C4 | **Enumerator meet-in-the-middle** | Q13 yes: goal states are described by base facts (positions, pairings) from which the derived facts follow, and depth is the obstacle.  Moves need not be reversible and goal states need not be written out | One spec plus enumerator declarations: `define-base-relation` for each base fact, with limits (optional `define-goal-filter`, `state-feasible?`); then `(find-goal-states)`, `(find-predecessors)` one layer at a time (each layer is saved; `load-predecessors` restores it in a fresh image and `find-predecessors` continues from the deepest layer), and `(solve-meeting-point :depth-cutoff N :solution-type min-length)` (note 8) | Goal states or backward layers can explode; constrain base relations early; a goal filter that writes in an expected answer narrows the search to it; `find-predecessors` runs on `*threads*` workers (checked); `find-goal-states` with threads not yet checked; except with `first` and `min-length`, the meeting search is exhaustive to its cutoff, so memory bounds the forward depth (note 8); confirm first that the backward step reproduces a known plan's last step (note 8); in Talos problems guessed predecessors are corrected (riders follow their carrier) and screened for physical consistency (2026-10-17), so layer counts recorded earlier include impossible states (corner-topo layer 1: 3,855 new before, 1,048 after); a single state's predecessors: `find-state-predecessors` (advisor-reference F23) |
 | C5 | **Goal-state enumeration** | The answer is an end arrangement, not a route, and is described by base facts | `define-base-relation` declarations and `(find-goal-states)` alone: step (a) of note 8 | Lists arrangements meeting the goal; says nothing about reaching them from a start |
 | C6 | **Milestones (solving advisor)** | Not chosen by this advisor: only when no other strategy here looks feasible (*When one search appears impractical*, above section 1) | Propose the [solving advisor](solving-advisor.md) with the hand-off of section 8; its dialogue chooses the subgoals and realizes each by hand, by one search, or by handing a hard subgoal back here (the third way in) | Usually gives up any guarantee about the whole plan; a subgoal reached the wrong way can block the rest (note 7) |
 
@@ -534,7 +534,7 @@ same approaches with their entry points.
    `find-predecessors` tries every action in the spec by default; `:actions` takes a list of
    action names to narrow it.  History (2026-10-12): it first picked actions by fixed names
    from the older corner model and re-guessed one object at a time, so on
-   corner-topo-advisor (5,828 goal states in 23 minutes) layer 1 checked 5.6 million
+   corner-topo (5,828 goal states in 23 minutes) layer 1 checked 5.6 million
    candidates in 14 minutes and kept none, although the known plan's last step is a valid
    predecessor.  Both are fixed (a held connector is now re-guessed together with its
    holder).  Result (2026-10-14): 6 backward layers from the 5,828 goal states (91,886
@@ -555,7 +555,7 @@ same approaches with their entry points.
    distances upper bounds, so "shortest" holds only for the backward set as built.  Before
    relying on this strategy, confirm that the backward step reproduces a known plan's last
    step.
-   Checks on every layer (corner-topo-advisor, 2026-11-07, which proved the problem
+   Checks on every layer (corner-topo, 2026-11-07, which proved the problem
    unsolvable when the backward set saturated with no walk among its predecessors):
    (i) the layer header must say `from N/N actions`; a smaller count means an action got no
    candidates (select-termini was skipped this way because it reaches the held connector
@@ -579,7 +579,7 @@ same approaches with their entry points.
    leave nothing different that later steps could depend on (beams created, objects moved,
    colors changed).  A known solution that uses the action rules it out at once.  Count first
    how many successors the action adds: removing a rarely chosen action cannot pay.
-   corner-topo-advisor: the single-terminus connect is used by the known 15-action plan; the
+   corner-topo: the single-terminus connect is used by the known 15-action plan; the
    retaining pickup is replaceable by a plain pickup and a reconnect except when the connector
    has more than 3 links; a plain put-down has no general replacement, since connecting instead
    creates beams that can cut others; together they add only 5 to 20% of the successors,
@@ -603,7 +603,7 @@ same approaches with their entry points.
    only if it removes states and the timing shows a gain.  (d) A fact the rules already
    enforce removes nothing; a fact true only of the expected answer narrows the search to
    that answer (C4).  Necessary steps go into the hand-off to the solving advisor (section 8).
-   corner-topo-advisor (2026-10-12 to 14): the problem analysis proved that receiver1 lit
+   corner-topo (2026-10-12 to 14): the problem analysis proved that receiver1 lit
    red and a complete blue chain to receiver3 cannot coexist, so gate1 is closed in every
    goal state.  True, but it follows from the rules, so no enumerated goal state violates it
    and as a filter it would remove nothing.  Its hints
@@ -757,7 +757,7 @@ get their checks (section 4.1) before a result relies on them.
 
 | Situation | First | Then |
 |---|---|---|
-| Too deep for one search | C4 if Q13 (corner-topo-advisor: a 14-step plan where direct search reached depth 8), C3 if Q12: each splits the depth between two searches | B18; then propose the solving advisor as a last resort (C6) |
+| Too deep for one search | C4 if Q13 (corner-topo: a 14-step plan where direct search reached depth 8), C3 if Q12: each splits the depth between two searches | B18; then propose the solving advisor as a last resort (C6) |
 | Large and reversible | C3, or C2 when D6 shows backward branching much smaller (Q12) | C4 if Q13; B18; B17 |
 | Fixed length (Q5) | C3 (exhausting the remaining length proves a position dead) | B18 |
 | Expensive derived state (Q14) | C1 | C4 |
@@ -1055,7 +1055,7 @@ nearly the whole reachable space, and its program cycles give the total in one r
 is clearly smaller over the whole depth; otherwise split the depth (C3), giving the backward
 search the depth its growth affords.  For the enumerator (C4), the backward growth is the size
 of each new layer that `find-predecessors` reports, against the forward growth per level
-(corner-topo-advisor: forward 5 to 8 times per level, out of reach at 14; six backward
+(corner-topo: forward 5 to 8 times per level, out of reach at 14; six backward
 layers and a 9-level forward search found a 14-step plan).
 
 **Answer-ordered data.**  A `first` search that finishes almost at once may only be following

@@ -1,3 +1,20 @@
+CONSOLIDATION NOTE (2026-11-16)
+  corner-topo-advisor was merged into corner-topo, and this record was moved here from
+  doc/problems/corner-topo-advisor/.  Below, "corner-topo-advisor" and
+  probs/problem-corner-topo-advisor.lisp mean probs/problem-corner-topo.lisp, which now also
+  carries the enumerator declarations.  The text below is kept as written, under the rules of
+  its date.  Changed since (details in Handoff.md and the last sections of search-analysis.txt):
+  - 2026-11-05: connect-connector was replaced by select-termini + put-connector, so a
+    connection costs two actions.  *max-connector-pairings* now counts a connector's pairings
+    on either side, including retained pairings and pending selections.
+  - By 2026-11-08 (commit eea88ff): a beam stops at a wall it cannot clear or at a body in its
+    path, and cuts nothing beyond.
+  - Cap 3 was proven unsolvable (2026-11-07, crossing rule before eea88ff); the cap is now 4.
+  - Current plan: 18 actions (Actions.lisp, validated 2026-11-16); not shown minimal.
+  Out of date in this file: *max-connector-pairings* 3, *depth-cutoff* 5 and the include list.
+  The spec now has cap 4, *depth-cutoff* 19, topo-lower-bound included, and the base relation
+  selected among its enumerator declarations.
+
 PROBLEM / REVISION / AUTHORIZED SCOPE
   Record: doc/problems/corner-topo-advisor/spec-analysis.txt (active).
   Specification: probs/problem-corner-topo-advisor.lisp (new file, written fresh; not a copy).

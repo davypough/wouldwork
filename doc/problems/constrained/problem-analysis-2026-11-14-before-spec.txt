@@ -1,0 +1,233 @@
+PROBLEM / REVISION / SOURCES / AUTHORIZED SCOPE
+  Problem: constrained (Talos).  Revision 1, 2026-11-14.
+  Sources: constrained-diagram.png (this directory); user dialogue and in-game
+  tests of 2026-11-14.  No spec exists yet.
+  Scope: problem analysis only.  No spec written, nothing staged or searched.
+  Status: CONDITIONALLY READY for the spec advisor (see AGREEMENT AND HANDOFF).
+
+AGREED PROBLEM DESCRIPTION
+  One agent in a walled environment must reach location L5.  Four gates divide
+  the environment; each opens only while its receivers are lit by a beam of the
+  receiver's colour.  Beams come from two wall transmitters and are relayed by
+  two movable connectors and one floor repeater.  A switch and a recorder are
+  present; neither has an identified useful effect (open items 1 and 2).
+  The description is agreed by the user except for those two items.
+
+USER OBJECTIVE AND ANSWER IDENTITY
+  Answer: one action sequence ending with the agent at L5.
+  Preference: fewest actions.  Any one shortest sequence is acceptable.
+  Depth: Claude estimates and runs searches to reasonable depths later
+  (user decision 2026-11-14); no user-supplied maximum for this problem.
+
+INTENDED RULES AND EXAMPLES
+  Coordinates are (x y), grid units.  Dialogue corrections are already applied.
+
+  Boundary (closed polygon):
+    (0 0) (22 0) (22 9) (27 9) (27 27) (9 27) (9 23) (0 23) (0 0)
+
+  Walls (x1 y1 x2 y2):
+    W1  9 0 9 3        W2  12 2 18 2      W3  0 4 1 4
+    W4  18 2 18 5      W5  18 8 18 14     W6  3 6 4 6
+    W7  4 6 4 9        W8  0 9 4 9        W9  0 13 4 13
+    W10 18 14 23 14    W11 23 14 23 27    W12 3 18 11 18
+    W13 13 18 14 18    W14 18 18 18 20    W15 18 22 18 27
+    W16 23 23 25 23    W17 17 18 18 18    W18 12 5 12 6
+    The line x=18 is OPEN between y=14 and y=18.
+
+  Windows (pass beams, block walking):
+    WIN1 12 2 12 5     WIN2 18 5 18 8     WIN3 0 18 3 18
+    WIN4 11 18 13 18   WIN5 14 18 17 18
+
+  Gates:
+    G1 18 0 18 2       G2 4 9 4 13        G3 25 23 27 23     G4 18 20 18 22
+
+  Fixtures.  Wall-mounted fixtures are drawn as a dot just off the wall on the
+  side they face and are recorded 1/10 off the wall on that side:
+    T1 red transmitter   (1/10 16)      faces east
+    T2 blue transmitter  (1 229/10)     faces south
+    R1 blue receiver     (17 1/10)      faces north
+    R2 blue receiver     (3 89/10)      faces south (south face of W8)
+    R3 blue receiver     (3 131/10)     faces north (north face of W9)
+    R4 red receiver      (181/10 19)    faces east  (east face of W14)
+    R5 red receiver      (24 229/10)    faces south (south face of W16)
+    FR1 floor repeater   (15 4)
+    SW1 switch at L1;  REC1 recorder at L2
+  Heights and elevations: defaults throughout (user closed this item).
+
+  Gate control (each gate open only while its receivers are active):
+    G1 <- R1      G2 <- R2 AND R3      G3 <- R5      G4 <- R4
+
+  Locations (integral or half-integral by user convention):
+    L1 (1 3)      L2 (1 11)     L3 (15 20)    L4 (1 15)     L5 (25 25)
+    L6 (21 17)    L7 (10 2)     L8 (20 6)     L9 (47/2 23/2)   L10 (2 21)
+    L1-L5 are the user's (L4 moved from (2 15)); L6-L10 were added in dialogue,
+    each for a geometric reason: L6 serves R4 from the alcove; L7 is the only
+    location seeing R1; L8 sees T1 from the east side; L9 is the only location
+    seeing R5; L10 sees T1 from the north room.
+
+  Walkable areas (computed from the segments):
+    main area      L1 L4 L6 L7   (includes the alcove x 18-23, y 14-27)
+    recorder room  L2            entered through G2
+    north room     L3 L10        entered through G4
+    east side      L8 L9         entered through G1
+    goal room      L5            entered through G3
+
+  Start: agent at L1, empty-handed.  C2 at L4, unpaired.  C1 at L3, paired with
+  T2, R3 and FR1.  So at the start R3 is active and FR1 carries blue; all four
+  gates are closed.  SW1 off.
+  Goal: agent at L5.
+
+  Agreed sightlines (from the actual environment, checked against geometry).
+  Each location pair is listed once, under the lower-numbered location.
+  "/" prefixes name the gate or windows the line passes.
+    L1  : R2, WIN1/FR1, L6, WIN2/L8
+    L2  : G2/L6, G2/WIN2/L8, G2/WIN4/L3
+    L3  : T2, WIN4/R3, WIN5/FR1, L10, WIN5/L7
+    L4  : T1, R3, WIN3/T2, L6, WIN2/L8, WIN3/L10
+    L5  : none
+    L6  : T1, R3, R4, WIN5/L10
+    L7  : R1, WIN1/FR1, WIN1/WIN2/L8, WIN1/WIN2/L9
+    L8  : WIN2/T1, WIN2/FR1, L9
+    L9  : R5, WIN2/FR1
+    L10 : T2, WIN3/T1, WIN3/R3
+  With the coordinates above, a 2D check (walls and boundary block, windows
+  pass, gates conditional) reproduces exactly this list.
+
+  Examples.
+    Allowed:   C2 at L7 paired with FR1 and R1 lights R1 and opens G1.
+    Allowed:   C2 at L1 paired with FR1 and R2 lights R2; with R3 already lit,
+               G2 opens.
+    Forbidden: C2 at L6 paired with T1 and R4 does NOT open G4.  The red beam
+               T1-L6 crosses C1's blue beams to R3 (near (8.8 16.4)) and to FR1
+               (near (15 16.7)); the crossing cuts the beams, R4 stays dark and
+               R3 goes dark (confirmed in the game by the user).
+    Forbidden: walking through a window; a beam through a closed gate.
+
+CURRENT IMPLEMENTATION
+  None.
+
+STRUCTURE AND GROWTH
+  10 locations, 2 connectors, 8 fixtures, 4 gates, 1 switch, 1 recorder.
+  A situation is: agent location and what it holds; each connector's location,
+  pairings and pending selections; switch state; and, if recording is modelled,
+  the recorder layer.  Lit hues, active receivers, open gates and active
+  crossings follow from these.
+  Choices per situation: move to a reachable location, pick up / select termini
+  / put down a connector, toggle SW1 (at L1), recorder actions (at L2).
+  Selection subsets are the main source of branching.  Moves are reversible,
+  so repeated situations must be merged.
+
+JUSTIFIED DESIGN
+  D1  Coordinate-derived model: author the segments, locations and fixtures;
+      let walking and sightlines be derived.  Alternative: hand-author the
+      sightline list.  Rejected because beam crossings and occlusion need the
+      coordinates anyway, and the coordinates already reproduce the agreed
+      list.  Reconsider if the game shows a sightline the geometry cannot give.
+  D2  The agreed sightline list is the acceptance check for the spec's derived
+      sightlines (location-fixture and location-location, with gate occluders).
+  D3  Include beam crossing.  It is required: it is what makes G4 unopenable
+      from the start.
+  D4  Graph search merging repeated situations, shortest plan.
+  D5  SW1: carried as a switch toggled from L1 with no modelled effect on any
+      gate (user tests: no gate, no recorder change).  Open item 1.
+  D6  Recorder: user tests show (a) recording auto-stops at 1.5 s, (b) without
+      a pause there is no playback and no ghost, and the agent is not returned
+      to the recorder, (c) with a pause there is a playback in which the ghost
+      runs for at most 1.5 s to the agent's recorded position and disappears,
+      (d) any number of cycles.  How to model this is open item 2; the user
+      holds that the recorder must be the key to opening G4.
+  No reduction of the answer set is proposed.
+
+WOULDWORK MAPPING  (source read 2026-11-14 unless noted)
+  Segments and derived walking: wall-segment>, window-segment>, gate-segment>,
+    boundary-wall; tech/-walkability-coordinates.lisp (zone graph, not straight
+    lines).  B.  Header read only.
+  Derived sightlines: tech/-beam-los-coordinates.lisp.  B.  A fixture or
+    location exactly on a segment is an error
+    (beam-coordinates-obstacle-intersection-parameter), hence the 1/10 offsets.
+  Fixtures: apparatus-coords> (tech/-apparatus-coordinates.lisp).  B.
+  Connectors, selection, pairing, lighting: tech/beam-relay.lisp.  B, as
+    described in doc/talos-reference.md 1.8 (documented, source-checked there
+    2026-10-12; not rechecked today).
+  Crossings: tech/beam-crossing.lisp.  B, same evidence status.
+  Floor repeater: tech/repeater.lisp.  B, documented only (type list in the
+    technology summary); behaviour as an automatic relay not read today.
+  Gate control: controls relation, DNF list; G2 needs the clause (R2 R3).  B/S.
+  Switch: tech/switch.lisp, toggle-switch, reach-via to a switch.  B,
+    documented only.
+  Recorder: tech/recorder.lisp and -recorder-*.  B for the standard cycle
+    (start, stop by returning, playback, *max-recorder-cycles* default 1).
+    A for this problem: no clock, no auto-stop, no 1.5 s limit, and no pause
+    in the session actions (grep of tech/-recorder-session.lisp).
+
+INITIAL SETTINGS AND DEFERRED MEASUREMENTS
+  Semantic: planning, min-length, graph.
+  Provisional: *max-connector-pairings* 3 (default); depth cutoff chosen later.
+  Parallel: (ww-set *threads* 16) proposed as the search baseline;
+  compatibility with the recorder technology is not checked and is left to the
+  spec advisor if the recorder is included.
+
+EVIDENCE
+  Intended rule: geometry, fixtures, control, start, goal (diagram + user).
+  Measurement in the game (user, 2026-11-14): sightline list; G1 and G2 can
+    each be opened with C2 alone; G3 and G4 cannot from the start; C2 at L6
+    darkens R3; recorder behaviour D6; SW1 opens no gate.
+  Deduction (Claude, 2D computation, not run in Wouldwork): walkable areas;
+    coordinates reproduce the sightline list; crossing points of the T1-L6
+    beam with C1's beams.
+  Source behaviour: mapping entries above.
+
+OPEN ISSUES AND CAPABILITY GAPS
+  1  SW1's function is unknown.  Deferred.  Affects only D5.
+  2  The recorder's role and model.  CONDITION on the handoff.  The stated
+     rules appear insufficient without it (see hints).  Settling it needs
+     further game tests and possibly engine work; both need approval.
+  3  Sightlines passing within about 0.25 of a wall end in the 2D check:
+     L2-L3, L6-L10, L7-L8, L8-FR1, L8-L9, L1-L8, L3-R3.  All are on the agreed
+     list, so they are accepted; recheck if the derived table differs.
+
+VALIDATION PLAN
+  1  Derived sightlines equal the agreed list (D2).
+  2  Derived walking gives the five areas and gate-guarded entries above.
+  3  Start state: R3 active, FR1 blue, all gates closed.
+  4  Replay the two allowed examples and the forbidden C2-at-L6 example.
+
+HINTS FOR DOWNSTREAM ADVISORS
+  H1  G4 cannot be opened by C2 alone from the start: every line from T1 into
+      the alcove crosses x=15 between y=14 and y=18, on the C1-FR1 beam.
+      Deduction plus game confirmation for L6.
+  H2  Something must first stop C1's blue beams from crossing the red beam.
+      User's candidate: the recorder.  Unverified.
+  H3  Connector count: G1 needs a connector at L7 fed blue via L3 (C1 at L3,
+      directly or through FR1).  With both connectors so placed the agent
+      enters the east side empty-handed, yet G3 needs a connector at L9.
+      So two connectors as currently understood do not suffice.  Deduction
+      from the agreed list; not run.
+
+AGREEMENT AND HANDOFF
+  User-confirmed: geometry and corrections, fixture positions and facings,
+  gate control, start, goal, locations L1-L10, sightline list, answer identity.
+  Conditionally ready.  Covered: everything except the recorder and SW1.
+  Condition: open item 2.  A spec can be written for the covered part now and
+  will be expected to find no plan until the missing mechanism is modelled.
+  Obligations for the spec: D1-D4, validation items 1-4, 1/10 fixture offsets.
+  Snapshot: problem-analysis-2026-11-14-before-spec.txt (agreed, conditional).
+  Next step: spec advisor in a new session; not yet authorized beyond that.
+
+DIALOGUE EVALUATION
+  Friction: (1) Claude judged an area sealed by eye and was wrong; fixed by
+  computing areas from coordinates.  (2) Choosing locations to obtain wanted
+  sightlines did not converge until the user supplied the real sightline list.
+  (3) A sightline was taken to make an effect achievable without checking
+  beam crossings.
+  Advisor change made (user-authorized 2026-11-14): one paragraph added to
+  doc/problem-advisor.md after the paragraph on preserving given geometry.
+
+CORRECTIONS
+  C1  Superseded: "the strip behind G4 is sealed, so G4 can never open."
+      Reason: x=18 is open between y=14 and y=18; the strip is an alcove of the
+      main area.  The enclosed room is the north room.  Replaced by H1.
+  C2  Superseded: L6 at (21 21).  Now (21 17).
+  C3  Superseded: L9 at (24 13).  Now (47/2 23/2), so the coordinates give L7-L9.
+  C4  Superseded readings: WIN4 x 10-13 -> 11-13; W12 x 3-10 -> 3-11; W13,
+      W15, W17, W18, G4 extents as corrected by the user.

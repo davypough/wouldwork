@@ -2148,6 +2148,7 @@ worker must print exactly as the caller does for its keys to match the reachable
    Returns T; the solutions are in *SOLUTION-PATHS*."
   (let ((saved-depth-cutoff *depth-cutoff*)
         (saved-solution-type *solution-type*)
+        (saved-min-steps-pruning-enabled *min-steps-pruning-enabled*)
         (saved-goal-form (get 'goal-fn :form))
         (saved-goal-fn-def (and (fboundp 'goal-fn) (symbol-function 'goal-fn)))
         (requested-solution-type solution-type))
@@ -2156,7 +2157,10 @@ worker must print exactly as the caller does for its keys to match the reachable
           (install-meeting-point :min-backward-depth min-backward-depth
                                  :original-goal-fn (when (member requested-solution-type '(first min-length))
                                                      saved-goal-fn-def))
-          (setf *depth-cutoff* depth-cutoff
+          ;; A lower bound estimates steps to the original goal, not to a meeting state, so
+          ;; it could prune states that still reach a meeting within the cutoff.
+          (setf *min-steps-pruning-enabled* nil
+                *depth-cutoff* depth-cutoff
                 *solution-type* (if (member requested-solution-type '(first min-length))
                                     requested-solution-type
                                     'every))
@@ -2284,7 +2288,8 @@ worker must print exactly as the caller does for its keys to match the reachable
               (printout-solution (first *solution-paths*))))
           t)
       (setf *depth-cutoff* saved-depth-cutoff
-            *solution-type* saved-solution-type)
+            *solution-type* saved-solution-type
+            *min-steps-pruning-enabled* saved-min-steps-pruning-enabled)
       (setf (get 'goal-fn :form) saved-goal-form)
       (when saved-goal-fn-def
         (setf (symbol-function 'goal-fn) saved-goal-fn-def)))))
@@ -2426,6 +2431,7 @@ worker must print exactly as the caller does for its keys to match the reachable
            (saved-problem-type *problem-type*)
            (saved-solution-type *solution-type*)
            (saved-depth-cutoff *depth-cutoff*)
+           (saved-min-steps-pruning-enabled *min-steps-pruning-enabled*)
            (saved-tree-or-graph *tree-or-graph*)
            (saved-algorithm *algorithm*)
            (saved-goal *goal*)
@@ -2466,7 +2472,10 @@ worker must print exactly as the caller does for its keys to match the reachable
                   *solution-type* solver-solution-type
                   *tree-or-graph* 'tree  ;note that graph mode may miss some candidate states
                   *algorithm* algorithm
-                  *depth-cutoff* (length enum-actions))
+                  *depth-cutoff* (length enum-actions)
+                  ;; Registered lower bounds are planning hooks too; they say nothing
+                  ;; true about partial CSP states.
+                  *min-steps-pruning-enabled* nil)
             (setf *start-state*
                   (make-problem-state
                    :name 'start :time 0 :value 0
@@ -2501,6 +2510,7 @@ worker must print exactly as the caller does for its keys to match the reachable
               *problem-type* saved-problem-type
               *solution-type* saved-solution-type
               *depth-cutoff* saved-depth-cutoff
+              *min-steps-pruning-enabled* saved-min-steps-pruning-enabled
               *tree-or-graph* saved-tree-or-graph
               *algorithm* saved-algorithm
               *goal* saved-goal)

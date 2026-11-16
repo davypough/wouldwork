@@ -1,3 +1,10 @@
+CONSOLIDATION NOTE (2026-11-16)
+  corner-topo-advisor was merged into corner-topo, and this record was moved here from
+  doc/problems/corner-topo-advisor/.  Entries through 2026-10-17 are kept as written: they use
+  the old connect-connector action and the old limit of 3 termini per connect, and
+  "corner-topo-advisor" in them means probs/problem-corner-topo.lisp.  The sections from
+  RULE CHANGES AND CAP onward (end of file) bring the record up to date.
+
 CORNER-TOPO-ADVISOR -- SEARCH ANALYSIS (search advisor record)
 
 PROBLEM / REVISION / SOURCES / AUTHORIZED SCOPE
@@ -394,3 +401,48 @@ BACKWARD LAYERS 1-6 AND MEETING, RE-RUN WITH SCREEN (2026-10-17, user, Windows, 
     178.8 s, 3.61 M states, 77.7% repeated, 2 solutions (as before: 181.5 s, 3.60 M).
     Same 14-step plan (8 forward + 6 backward), step for step; shortest for this backward set,
     now one containing only physically possible states.
+
+RULE CHANGES AND CAP (2026-11-05 to 2026-11-10; details and evidence in Handoff.md)
+  2026-11-05: connect-connector replaced by select-termini + put-connector (a connection costs
+    two actions); *max-connector-pairings* counts pairings on either side of a connector,
+    retained pairings and pending selections.  New base relation selected (held connector only,
+    sharing the cap with paired).
+  2026-11-07: cap 3 proven unsolvable by backward enumeration (1,351 goal states; layers
+    1,211 / 1,125 / 61 / 144, then saturated at 3,892 states, all with agent1 at location4).
+    The plans above needed a fourth pairing on one connector, counted on either side.
+  By 2026-11-08 (eea88ff): beam-crossing edits (a beam stops at a wall it cannot clear or at a
+    body in its path and cuts nothing beyond).  Cap-3 goal states under the new rule: 1,409.
+  2026-11-08 to 11-10, cap 4: 10,546 goal states; backward layers 13,226 / 18,047 / 2,016 /
+    9,048 / 15,429 (68,312 states); (solve-meeting-point :depth-cutoff 14 :solution-type first)
+    found a 19-action plan in 1,017 s.  min-length meeting searches ran out of memory.
+  The saved goal and predecessor files named in Handoff.md are no longer in the project folder.
+
+18-ACTION PLAN (2026-11-16)
+  The 14-step plan of 2026-10-14 (MEET-IN-THE-MIDDLE, DEPTH 9 x 6 LAYERS above), with each of
+  its four connects rewritten as select-termini + put-connector, replays under the current
+  rules at cap 4: 18 actions, success, goal satisfied, solution validators accepted.
+  Assistant, Linux copy, SBCL 2.2.9; confirmed by the user on Windows (Validation.txt).
+  It replaces the 19-action plan in Actions.lisp.  The selection for the connector carried to
+  location4 is made at location3, before the walk.  Not shown minimal under the current rules:
+  the 14-step minimality result was for the old rules and its own backward set.
+
+SPEC CONSOLIDATION INTO CORNER-TOPO (2026-11-16, user-approved)
+  The enumerator declarations (has-location, holding, paired, selected, fluents-feasible?,
+  state-feasible?, goal-needs-sighted-links) were appended to probs/problem-corner-topo.lisp,
+  which keeps *depth-cutoff* 19, cap 4 and topo-lower-bound.  The merged spec stages cleanly and
+  replays the 18-action plan (Linux copy and Windows).
+
+LOWER BOUND AND THE ENUMERATOR (2026-11-16, engine edit approved; src/ww-enumerator-run.lisp)
+  Finding (source): enumeration disabled the hook functions (min-steps-remaining? and others)
+    but not registered lower-bound contributors, which is how topo-lower-bound plugs in; and
+    solve-meeting-point-fn left the bound active, although it estimates steps to the original
+    goal, not to a meeting state, so it could prune states that still reach a meeting.
+  Edit: %enumerate-state-csp and solve-meeting-point-fn set *min-steps-pruning-enabled* to NIL
+    for their search and restore it afterwards.
+  Test (assistant, Linux copy, serial, cap-2 copies of the merged spec, find-goal-states
+    :exclude-relations selected):
+      without topo-lower-bound            56 goal states, 280 renamed duplicates dropped, 432 s
+      with it, before the edit            56, 280, 486 s; 0 pruned in about 1.7 M evaluations
+      with it, after the edit             56, 280, 454 s; bound not evaluated
+    Counts compared, not the sets fact for fact.  (run-enumerator-checks) passes on Windows
+    (user).  The meeting-search edit has not been exercised by a run.

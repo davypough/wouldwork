@@ -1,8 +1,23 @@
 # corner-topo — Handoff
-Updated 2026-11-10.  Status: SOLVED at cap 4 (*max-connector-pairings* 4, pairings on either
-side counted) -- 19 actions, found by solve-meeting-point and validated 2026-11-10 (Cap 4 section
-below; Actions.lisp, Validation.txt).  At cap 3 it was proven UNSOLVABLE 2026-11-07, under the
-beam-crossing rule before eea88ff (proof section below).
+Updated 2026-11-16.  Status: SOLVED at cap 4 (*max-connector-pairings* 4, pairings on either
+side counted) -- 18 actions, validated 2026-11-16 (next section; Actions.lisp, Validation.txt).
+Not shown minimal.  At cap 3 it was proven UNSOLVABLE 2026-11-07, under the beam-crossing rule
+before eea88ff (proof section below).
+
+## Consolidation and the 18-action plan (2026-11-16)
+- corner-topo-advisor is merged into corner-topo.  probs/problem-corner-topo.lisp now carries
+  the enumerator declarations; wherever this file names probs/problem-corner-topo-advisor.lisp,
+  read probs/problem-corner-topo.lisp.  The advisor records (problem-analysis.txt,
+  spec-analysis.txt, spec-analysis-search-handoff.txt, search-analysis.txt) are in this folder.
+- 18-action plan: the 14-step meet-in-the-middle plan of 2026-10-14 (search-analysis.txt), with
+  each connect rewritten as select-termini + put-connector.  connector1 to location2 {receiver3
+  receiver1 transmitter2}; connector2 at location3 {connector1 receiver1 transmitter1} opens
+  gate1; connector3 carried to location4 {transmitter1}; connector2 re-placed at location3
+  {connector1 receiver2 transmitter1}; last walk west; picking up connector3 closes gate1 and
+  connector1 turns blue.  It replaces the 19-action plan of 2026-11-10.
+- Engine: enumeration and the meeting search now switch lower-bound pruning off for their own
+  searches (src/ww-enumerator-run.lisp), so the spec can keep topo-lower-bound for (solve).
+- The saved goal and predecessor files named below are no longer in the project folder.
 
 ## Proof by backward enumeration (2026-11-07)
 Spec probs/problem-corner-topo-advisor.lisp (same rules; enumerator declarations: base relations

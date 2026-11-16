@@ -1,0 +1,150 @@
+;;; Temporary-checkout exporter for the Corner SAT comparison.
+(in-package :ww)
+
+(defun corner-json (value stream)
+  ;; All strings in the interchange are Lisp symbol names.
+  (typecase value
+    (list (write-char #\[ stream)
+          (loop for tail on value do (corner-json (car tail) stream)
+                when (cdr tail) do (write-char #\, stream))
+          (write-char #\] stream))
+    (integer (princ value stream))
+    (symbol (prin1 (string-downcase (symbol-name value)) stream))))
+
+(defun corner-row (stream &rest fields)
+  (corner-json fields stream)
+  (terpri stream))
+
+(defun corner-height (endpoint)
+  (if (member endpoint '(location1 location2 location3 location4))
+      (funcall 'top *start-state* 'connector1)
+      (funcall 'top *start-state* endpoint)))
+
+(defun corner-export-geometry (stream)
+  (let* ((locations '(location1 location2 location3 location4))
+         (ends (append locations '(receiver1 receiver2 receiver3 transmitter1 transmitter2)))
+         (crossings (funcall 'get-current-beam-crossings *start-state*))
+         (statics (topo-relaxed-static-propositions)))
+    (assert (= *max-connector-pairings* 4))
+    (corner-row stream 'relay-order (type-spec-instances 'relay))
+    (dolist (fact statics)
+      (when (member (car fact) '(crossings-along-beam> beam-crossings-before-gate>
+                                  crossings-coincide> traverse-via traverse-via>))
+        (corner-row stream 'static fact)))
+    (dolist (x crossings)
+      (corner-row stream 'intersection x (multiple-value-list
+                                           (funcall 'beam-crossing-endpoints *start-state* x))))
+    (dolist (a locations)
+      (dolist (b ends)
+        (when (funcall 'potentially-visible *start-state* a (corner-height a) b (corner-height b))
+          (corner-row stream 'selectable a b))))
+    ;; Geometry factors only. Empty space, gate, and single-body blockers are probed
+    ;; independently; no pairings, lighting or reference successors enter these tables.
+    (dolist (body (cons nil (loop for obj in '(agent1 connector1) append
+                                 (loop for loc in locations collect (list 'has-location obj loc)))))
+      (let ((state (bw-make-state-from-propositions (cons '(open gate1) (and body (list body))))))
+        (dolist (a locations)
+          (dolist (b ends)
+            (when (funcall 'beam-visible state a (corner-height a) b (corner-height b))
+              (corner-row stream 'visible body a b))))
+        (dolist (x crossings)
+          (destructuring-bind (a b c d) (multiple-value-list (funcall 'beam-crossing-endpoints state x))
+            (dolist (pair (list (list a b) (list b a) (list c d) (list d c)))
+              (destructuring-bind (src dst) pair
+                (unless (funcall 'beam-barrier-before-crossing state src dst x
+                                 (corner-height src) (corner-height dst))
+                  (corner-row stream 'prefix body src dst x))))))))
+    (let ((state (bw-make-state-from-propositions nil)))
+      (dolist (a locations)
+        (dolist (b ends)
+          (when (funcall 'beam-visible state a (corner-height a) b (corner-height b))
+            (corner-row stream 'closed-visible a b)))))))
+
+(defun corner-export (path)
+  (let ((state *start-state*) (*symmetry-pruning* nil))
+    (with-open-file (s path :direction :output :if-exists :supersede)
+      (corner-export-geometry s)
+      (loop for i from 0 for tail on (append *accepted-actions* '(nil))
+            for form = (car tail)
+            do (corner-row s 'state i (list-database (problem-state.idb state)))
+               (dolist (child (generate-children (make-node :state (copy-problem-state state) :depth i)))
+                 (corner-row s 'child i (problem-state.name child)
+                             (problem-state.instantiations child)
+                             (list-database (problem-state.idb child))))
+               (when form
+                 (let ((replay (validate-action-sequence state (list form))))
+                   (assert (action-sequence-validation-success-p replay))
+                   (setf state (action-sequence-validation-final-state replay))
+                   (corner-row s 'action i (problem-state.name state)
+                               (problem-state.instantiations state)))))
+      (assert (goal state)))))
+
+(defun corner-prefix-state (prefix)
+  (let ((result (validate-action-sequence *start-state* prefix)))
+    (assert (action-sequence-validation-success-p result))
+    (action-sequence-validation-final-state result)))
+
+(defun corner-search-input (path &optional prefix)
+  (with-open-file (s path :direction :output :if-exists :supersede)
+    (corner-export-geometry s)
+    (corner-row s 'state (length prefix)
+                (list-database (problem-state.idb (corner-prefix-state prefix))))
+    (assert (eq (first *goal*) 'and))
+    (corner-row s 'goal (rest *goal*))))
+
+(defun corner-forward-search (prefix seconds)
+  "Find the first continuation within the same remaining budget as SAT."
+  (let* ((origin *start-state*)
+         (checkpoint (corner-prefix-state prefix))
+         (*threads* 0)
+         (*algorithm* 'depth-first)
+         (*tree-or-graph* 'graph)
+         (*solution-type* 'first)
+         (*depth-cutoff* (- 19 (length prefix)))
+         (*time-limit* seconds)
+         (start (get-internal-real-time)))
+    (solve-subgoal-from-form checkpoint *goal*)
+    (format t "~&CORNER-WW ~A (~A), ~,3F s, ~D states, ~D evaluations and ~D lower-bound prunes, canonical symmetry ~S.~%"
+            (search-outcome-status *last-search-outcome*) (search-outcome-reason *last-search-outcome*)
+            (/ (- (get-internal-real-time) start) internal-time-units-per-second)
+            *total-states-processed* *min-steps-contributor-evaluations* *lower-bound-pruned*
+            (use-canonical-symmetry-p))
+    (unless *time-limit-reached* (assert *solutions-valid*))
+    (when *solutions-valid*
+      (let* ((*start-state* origin)
+             (suffix (normalize-validation-actions (solution.path (first *solution-paths*))))
+             (plan (append prefix suffix))
+             (result (validate-action-sequence origin plan :goal-test #'goal-fn)))
+        (assert (and (= (length suffix) (solution.depth (first *solution-paths*)))
+                     (<= (length suffix) *depth-cutoff*)
+                     (action-sequence-validation-success-p result)
+                     (action-sequence-validation-goal-satisfied-p result)
+                     (report-solution-validator-verdicts plan
+                       (action-sequence-validation-final-state result))))
+        (format t "~&CORNER-WW validated ~D prefix + ~D discovered actions.~%" (length prefix) (length suffix))
+        (dolist (action suffix)
+          (format t "~&CORNER-WW ~A~%" (format-action-for-display action)))))))
+
+(defun corner-search-action (state)
+  (let ((kind (problem-state.name state))
+        (args (problem-state.instantiations state)))
+    (list kind (case kind
+                 (move (fourth (car (last (second args)))))
+                 (select-termini (third args))
+                 (otherwise (second args)))
+          (when (eq kind 'select-termini)
+            (sort (copy-list (second args)) #'string<)))))
+
+(defun corner-replay-search (plan &optional prefix)
+  (let ((state (corner-prefix-state prefix)) (*symmetry-pruning* nil) forms)
+    (loop for action in plan for i from 1
+          do (setf state (find action (generate-children (make-node :state state :depth (1- i)))
+                               :key #'corner-search-action :test #'equal))
+             (assert state () "SAT action ~D failed: ~S" i action)
+             (push (cons (problem-state.name state) (problem-state.instantiations state)) forms))
+    (setf forms (append prefix (nreverse forms)))
+    (let ((result (validate-action-sequence *start-state* forms :goal-test #'goal-fn)))
+      (assert (and (action-sequence-validation-success-p result)
+                   (action-sequence-validation-goal-satisfied-p result)
+                   (report-solution-validator-verdicts forms
+                     (action-sequence-validation-final-state result)))))))

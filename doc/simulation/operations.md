@@ -23,6 +23,8 @@ propose-and-try loop below to take most of the session.
 - A does not drive the game.  A's key presses arrive (W, A, S, D move; E picks up), but its
   pointer moves mostly do not turn the view, so A cannot aim.  If the game ever offers
   keyboard bindings for looking around, this can be revisited.
+- Exception: in the photo-mode camera (see *Aerial survey* below) A can steer and aim the
+  camera itself.
 
 
 ## Setup
@@ -67,6 +69,10 @@ Goal: a shared description precise enough to reason about beams.
   walls and window spans; every transmitter and receiver with its colour and the way it
   faces; connectors and other objects with their starting places; plates; what each gate
   is controlled by; the goal.
+- A wall in the model is a simplification: a run of whatever the agent cannot pass and beams
+  cannot penetrate, such as solid masonry, columns, arches, roofing, grates and fences.  Record
+  the run as one wall; note its make-up only where it matters (a span that is open, or one a
+  beam can cross, is a window, not a wall).
 - Areas behind closed gates are surveyed later, as they open.  Mark them unknown, not
   empty.
 - Walk the whole of every area, corners and side strips included.  In intersect the
@@ -79,6 +85,33 @@ Goal: a shared description precise enough to reason about beams.
   face, with an arrow for the facing direction; gates on the wall span they close; windows
   as dashed spans.  If D already has a diagram, A checks it against the screenshots.
 - Name places as D names them (location1, gate2, window3).  No invented region labels.
+
+#### Aerial survey (photo-mode camera)
+
+First used on intersect, 2026-11-11, to map its external walls
+(`doc/problems/intersect/intersect-walls-survey.drawio`).  A drives the camera.
+
+- F3 opens the camera, H hides its panel, Esc closes it.  A must click the game once
+  before key presses reach it.
+- Set the field of view to its minimum (60°) for the least perspective distortion.  A high,
+  straight-down view then gives a usable plan of the whole level.
+- Movement is relative to the camera's facing: when looking straight down, W and S move
+  down and up, Q and E move toward the screen's bottom and top, and A and D move left and
+  right.  Speed on screen grows as the camera descends, so use short holds (about 1 s) when
+  low.
+- Tilting and turning need slow drags with the mouse button held (several moves per drag,
+  roughly 300 px of drag per 30°).  Fast drags often do nothing.  After a turn A loses track
+  of which screen direction is which compass point; prefer to stay facing north, and when a
+  turn is needed, have D put the camera in place first.
+- Measure wall lines in the high plan view, not road or path edges.  Roads, grass strips
+  and paths outside the walls look like boundaries from above.
+- Trees hide whole rooms from above.  Drop below the canopy, just above wall-top height,
+  and follow a wall from corner to corner.  At that height A also sees the face of the wall
+  on the camera's side.
+- Upright columns look like beams lying flat when seen from just above; check from the side
+  before recording a span as open or solid.
+- Openings under a roof (such as an entrance) need the camera at about head height,
+  looking level.
 
 ### 2. Agree the facts and the goal
 
