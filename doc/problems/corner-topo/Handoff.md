@@ -4,6 +4,20 @@ side counted) -- 18 actions, validated 2026-11-16 (next section; Actions.lisp, V
 Not shown minimal.  At cap 3 it was proven UNSOLVABLE 2026-11-07, under the beam-crossing rule
 before eea88ff (proof section below).
 
+## Subgoal route (2026-11-16): SOLVED in 19 actions
+A second, independent route by subgoals (Briefing.md, Subgoal route and what follows it).  The
+18-action plan below stays the accepted solution; Actions.lisp and Validation.txt are unchanged.
+Subgoals from the start: a connector at location4 paired with transmitter1 with gate1 open
+(8 actions, cutoff 9); the ready-to-walk arrangement found by a backward sweep (9, cutoff 10);
+the goal (2, cutoff 3).  About 90 s of search on 2 cores.
+Checkpoint: Checkpoint.txt | 3 subgoals, 19 actions | SHA-256 adfe57679927e5ecaccd08a33f5ea026201c5ea605c4b3bc78190bac3fb07243 (as written on Linux) | goal state
+Validated on the cloud Linux copy and by D on Windows 2026-11-16 (validate-search-checkpoint:
+19 actions, SUCCESS-P, GOAL-CHECKED-P, GOAL-SATISFIED-P T).
+Next step: none for this route.  To replay: (stage corner-topo), (ww-set *threads* 16), then
+(validate-search-checkpoint (import-search-checkpoint (merge-pathnames "doc/problems/corner-topo/Checkpoint.txt" (asdf:system-source-directory :wouldwork))))
+Lessons written into doc/solving-advisor.md 2026-11-16 (Choosing a subgoal; Backward analysis,
+Backward sweep).
+
 ## Consolidation and the 18-action plan (2026-11-16)
 - corner-topo-advisor is merged into corner-topo.  probs/problem-corner-topo.lisp now carries
   the enumerator declarations; wherever this file names probs/problem-corner-topo-advisor.lisp,

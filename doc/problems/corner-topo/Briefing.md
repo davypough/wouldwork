@@ -106,3 +106,140 @@ Premises: none beyond the spec (wall3 deleted by D beforehand). The crossing geo
 was confirmed only indirectly, by the successful replay.
 Limits: no claim that 15 is the global minimum length. No search was run.
 Validator note: connect-connector termini lists are compared in strict order (the enumeration order), not as sets; rule documented in the Problem-Solving Guide.
+
+## Subgoal route (opened 2026-11-16)
+Purpose (D): see whether subgoals solve corner-topo more easily than meet-in-the-middle, giving
+up minimality, and approaching the problem as new: subgoals are derived from the start state,
+the layout and the goal only; the earlier analyses are used for checking, not for choosing.
+Actions.lisp and Validation.txt still hold the 18-action plan and are left untouched until this
+route reaches the goal.  The route's current endpoint is in Checkpoint.txt.
+Reasoning for SG1 (A, agreed by D): agent1 must pass gate1, so receiver1 must be red at that
+moment; all three receivers lit at once is CONTRADICTED (separation result D1,
+problem-analysis.txt; used as a check), so blue is finished from location4; that needs a
+connector at location4, so a connector must be carried through an open gate1.  Left open: which
+connector opens gate1 and from where, what the carried one is for, and whether one trip west
+is enough.
+
+subgoal | whose idea | check | route | result
+SG1 agent1 at location4 holding a connector, gate1 open | A, agreed by D | CONSISTENT (forced by the reasoning above; not a trap, gate1 open) | one plain search | REALIZED, 6 actions, validated NIL
+
+SG1 commands (assistant, cloud Linux copy, SBCL 2.2.9, 2 cores; snapshot of the checkout taken
+2026-11-16): stage corner-topo; *threads* 16; *depth-cutoff* 8 (hand count 6 plus 2);
+*solution-type* min-length; *min-steps-pruning-enabled* nil (topo-lower-bound estimates the
+final goal); checkpoint form with goal
+(and (has-location agent1 location4) (exists (?c connector) (holding agent1 ?c)) (open gate1)).
+Result: completed normally, 0.5 s, 21,098 states, 42.7% repeats, 2 solution paths, minimum 6:
+  pickup connector1 at location1; walk location1 -> location3; select (receiver3 receiver2
+  receiver1 transmitter1) for connector1; put connector1 at location3; pickup connector3 at
+  location3; walk location3 -> location4 through gate1.
+Endpoint review: agent1 at location4 holding connector3 (no selections); connector1 at location3
+red, paired with receiver3, receiver2, receiver1, transmitter1 (at the cap of 4), lighting
+receiver1 and receiver2; connector2 untouched at location2; gate1 open.  receiver2 is already
+lit; the receiver3 pairing carries red and lights nothing.
+SG2 (first try) final goal straight from the SG1 endpoint | A, agreed by D | tests whether one trip west is enough | one plain search | BOUND: no solution within 8 actions of the SG1 endpoint
+
+SG2 first-try commands (assistant, same cloud copy): import Checkpoint.txt (SG1); *threads* 16;
+*depth-cutoff* 8; min-length; lower-bound pruning off; checkpoint form with the spec's goal.
+Result: completed normally, no solutions, 24 s, 687,973 states, 70.0% repeats, 23.5% cutoff hits,
+average branching 7.6.  Checkpoint returned unchanged.
+Interpretation: a bound relative to this start and cutoff, not a refutation.  From this
+particular arrangement (connector1 at location3 with its four pairings) there is no finish in 8
+actions, whether agent1 stays west or goes back.  It does not show that one trip can never work
+from some other east-side arrangement.
+SG2 everything wired, blue dark, gate1 open, agent1 east | A, agreed by D | CONSISTENT as worded; three goal forms tried | one plain search each | REALIZED three times, all three endpoints REJECTED at review (not accepted; Checkpoint.txt still holds SG1)
+
+SG2 commands (assistant, same cloud copy; each from Checkpoint.txt, *threads* 16, cutoff 9,
+min-length, lower-bound pruning off).  Common part of the goal: agent1 not at location4, gate1
+open, receiver2 active.
+ a. plus: a placed connector paired with transmitter2 and receiver3 (or through a second
+    connector).  0.4 s, 10,303 states, 3 actions: walk to location3, select (receiver3 receiver1
+    transmitter2 transmitter1) for connector3, put it at location3 beside connector1.
+    Rejected: the blue connector is also paired with transmitter1 and shares location3 with the
+    lit red connector, so it can never light.
+ b. plus: the blue connector(s) not paired with transmitter1, alone at their location, and in
+    structural sight of transmitter2 / receiver3.  5.7 s, 168,434 states, 7 actions: connector3
+    to location2 {receiver3 receiver2 receiver1 transmitter2}; connector2 to location1
+    {transmitter1}, whose beam cuts the blue feed beside the transmitters.
+    Rejected at look-ahead: what keeps blue dark stands at location1, which agent1 cannot touch
+    from location4; all three connectors are east and nothing is carried.
+ c. plus: a connector held or at location4.  49.5 s, 1,378,381 states, 8 actions: connector3
+    dropped unpaired at location1; connector2 carried to location4 {receiver3 transmitter2};
+    agent1 back at location3.
+    Rejected: blue runs through gate1, so it needs gate1 open, which needs receiver1 red, and
+    the two cannot coexist (D1); a body at location1 also blocks that sightline.
+Lesson: a condition on pairings alone is under-determined.  The state wanted at the last walk
+is defined by what would happen after one more action at location4 ("blue lights once X is
+done there"), which is not a fact of the state, so min-length finds the cheapest arrangement
+that fits the words.  Each tightening removed one such arrangement and admitted another.
+Growth seen: 0.4 s / 5.7 s / 49.5 s as the subgoal tightened (min 3 / 7 / 8 actions).
+
+### Backward step from the goal (2026-11-16)
+Question: what must the state be just before the last walk west, so that one more action at
+location4 reaches the goal?  Two options for that last action: (b) pick up a connector already
+at location4; (c) put down a connector carried across.
+Method (assistant, cloud copy, serial; R4-style replay over a full sweep, not a search): build
+every candidate state from facts (make-start-state-from-facts, then propagation), keep those with
+receiver1 active, replay the walk through gate1 and the one action at location4
+(validate-action-sequence with the spec's goal test).
+Candidates: two connectors east (location1-3, any pairings to apparatus in structural sight, up
+to the cap of 4 counted on both sides), any pairings among the three connectors in either
+direction, the third connector at location4 (b) or held with selections (c), its termini any of
+transmitter1, transmitter2, receiver2, receiver3; agent1 tried at location3, location2, location1.
+ (b) pickup last: 96,152 states built, 13,588 with gate1 open, 60 reach the goal.
+ (c) put-down last: 122,991 built, 15,612 with gate1 open, none reaches the goal.  (One hand
+     case replayed to confirm the held/selected facts and the put form work.)
+All 60 share one east arrangement:
+  - a connector at location2 paired with transmitter2, receiver3 and receiver1;
+  - a connector at location3 paired with transmitter1 and receiver2 (a receiver3 pairing there
+    is optional and changes nothing);
+  - those two connectors paired with each other (either direction);
+  - the connector at location4 paired with transmitter1 (its other pairings are optional);
+  - agent1 at location3 or location1.
+The location2 connector carries four pairings, the cap.
+Limits: endings with more than one action at location4, two connectors at location4, and
+pairings without structural sight were not swept.
+
+### Subgoal route, second pass: solved in 19 actions (2026-11-16)
+Target state T (from the backward step): connector at location2 {transmitter2 receiver3
+receiver1}; connector at location3 {transmitter1 receiver2} paired with it; connector at
+location4 {transmitter1}; gate1 open; agent1 at location3 or location1.
+From the first SG1 endpoint (agent1 at location4 holding a connector), T was not reached:
+cutoff 11 ran out of heap on the cloud copy (5.5 GB, about 1.2M stored states, 151 s; neither a
+bound nor a result); split at "connector at location4 paired with transmitter1, gate1 open":
+no solution within 4 actions (0.3 s), and T not within 9 (72 s, 1.93M states).  Reason (hand
+reading, not replayed): that endpoint's opener is location3 -> receiver1, which the location4
+connector's transmitter1 beam cuts, so the opener has to be rebuilt first.  The first SG1 was
+too loose: it fixed nothing about the opener.  That endpoint was abandoned.
+Second pass, from the start state (all: *threads* 16, min-length, lower-bound pruning off,
+checkpoint form, cloud copy, 2 cores):
+
+subgoal | whose idea | check | route | result
+SG1' a connector at location4 paired with transmitter1, gate1 open | A (split point agreed with D) | from the backward step | one plain search, cutoff 9 | REALIZED, 8 actions, 27 s, 873,639 states
+SG2' target state T | A, agreed by D | backward-step sweep | one plain search, cutoff 10 | REALIZED, 9 actions, 62 s, 1,506,708 states
+SG3' the spec's goal | spec | -- | one plain search, cutoff 3 | REALIZED, 2 actions, 1,313 states
+
+Path (19 actions; Checkpoint.txt):
+  1 pickup connector1 at location1; 2 select (connector3 connector2 receiver1 transmitter1);
+  3 put connector1 at location1 (gate1 opens); 4 walk to location2; 5 pickup connector2;
+  6 select (transmitter1); 7 walk to location4; 8 put connector2 at location4;
+  9 walk to location1; 10 pickup connector1; 11 walk to location2;
+  12 select (receiver3 receiver1 transmitter2); 13 put connector1 at location2;
+  14 walk to location3; 15 pickup connector3; 16 select (connector1 receiver2 transmitter1);
+  17 put connector3 at location3 (gate1 opens again); 18 walk to location4;
+  19 pickup connector2 (retaining its pairing).
+Validation: (validate-search-checkpoint) on the 19-action checkpoint: no failure, GOAL-CHECKED-P
+T, GOAL-SATISFIED-P T (cloud copy, SBCL 2.2.9).  Confirmed by D on Windows 2026-11-16: 3 checkpoints
+restored, 19 actions replayed, SUCCESS-P, GOAL-CHECKED-P and GOAL-SATISFIED-P T.
+The connector selections in action 2 beyond receiver1 and transmitter1 do nothing.
+
+## Result of the subgoal route
+SOLVED by subgoals, 19 actions, one more than the 18-action meet-in-the-middle plan, which stays
+in Actions.lisp and Validation.txt.  Cost: three searches (about 90 s on 2 cores) plus one
+two-minute sweep of "ready to walk" states; against about 27 h of goal enumeration and backward
+layers for meet-in-the-middle at cap 4.
+What made it work: (1) one backward step from the goal, done as a sweep of built states, turned
+the vague "everything wired, blue dark" into a concrete target; (2) the forward subgoal before
+it was the target's own hard precondition (the location4 connector in place with gate1 open),
+searched from the start.  Forward subgoals stated only from general reasoning either left too
+much open (first SG1) or were satisfied by useless arrangements (SG2, three forms).
+No claim about minimal length.

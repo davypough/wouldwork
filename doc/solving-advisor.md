@@ -3,7 +3,7 @@
 > **Usage:** The last resort among the four advisors.  Invoke it when the
 > [search advisor](search-advisor.md) has found no strategy that makes one search solve the
 > whole problem, or to resume a problem already in progress here.  Revised 2026-10-15 to work
-> with the search advisor; the history is in git.
+> with the search advisor; corner-topo's subgoal lessons added 2026-11-16; the history is in git.
 
 **Place among the advisors.**  The problem advisor defines and characterizes the problem; the
 [spec advisor](spec-advisor.md) builds a faithful spec for forward search; the search advisor
@@ -182,6 +182,34 @@ plan's 31), moved here from the search advisor:
 - In Talos recorder problems, add `(recorder-cycle-ended)` only where a cycle should
   close; legs may run inside one cycle.
 
+Lessons from corner-topo (2026-11-16: 19 actions from three subgoal searches of about 90 s in
+all, against an 18-action meet-in-the-middle plan that took about 27 h of enumeration):
+- **A subgoal must be a fact of the state, not a promise about later.** "Everything wired,
+  blue dark, gate1 open" meant "blue would light after one more action at location4", which
+  no pairing condition captures. Three wordings were each realized in under a minute by a
+  useless arrangement (a blue connector fed both hues; the blocking connector where the agent
+  could never reach it; blue routed through the gate it needs closed). When a subgoal can
+  only be described by what a later action would do, define it with a backward sweep
+  (*Backward analysis*) instead of tightening the wording.
+- **Review every endpoint against the next step before accepting it.** A min-length search
+  returns the cheapest state that fits the words. Ask of each endpoint: what holds each needed
+  condition, can the agent still reach it from where the next step leaves it, and does anything
+  it shares a location or a beam with spoil it.
+- **A loose first subgoal can cost the whole leg.** "agent1 at location4 holding a connector,
+  gate1 open" fixed nothing about how gate1 was held open; the opener the search chose was cut
+  by the very beam the next step needed, and the target was then 16 actions away instead of 9.
+  Such an endpoint is not a trap, only expensive: abandon it and restart from the last sound
+  endpoint (here the start) rather than deepening.
+- **Take the forward subgoal from the target's own hard precondition.** Once the sweep had
+  fixed the state before the last walk, the subgoal before it was the one part of that state
+  that needs an earlier trip (the connector at location4, with gate1 open), searched from the
+  start.
+- **Check for traps first.** Where every action can be undone, a poor endpoint costs actions
+  only; name the states that cannot be left (here agent1 west of a closed gate1) and keep
+  subgoal endpoints out of them unless they are the goal.
+- **Watch memory as well as time.** A subgoal search that outruns the heap gives neither a
+  bound nor a result; size the cutoff from stored states per level as well as seconds.
+
 ### Backward analysis
 
 Use when the subgoals are best found from the goal (as for crelay-topo's third cycle,
@@ -199,6 +227,26 @@ finds the last action that made the condition true, and the condition just befor
 - **Stopping.** Keep a gap list: what the current condition needs that the accepted
   endpoint lacks.  When the gaps are few, write the remainder forward from the chain map
   by hand and validate it whole from the start (*Realizing a subgoal*, route 1).
+
+Backward sweep (corner-topo, 2026-11-16).  Use it when the last steps are few and forced in
+kind but the state before them is not known: for example "walk through the gate, then one
+action at the goal location".
+- List the kinds of last action from the rules (there: pick up a connector at location4, or
+  put down a carried one), and give each its own sweep.
+- Build every candidate state before those steps from facts
+  (`make-start-state-from-facts`, then `maybe-propagate-changes!`, dropping states
+  `state-is-inconsistent` rejects), keep those meeting the steps' precondition (gate1 open),
+  and replay the steps with `validate-action-sequence` and the spec's goal test.
+- Narrow the candidates only by necessary conditions, and say which: there, pairings only to
+  apparatus in structural sight, the pairing cap, two connectors east and one at location4 or
+  held.  Use each interchangeable object in one role only.
+- Replay one hand-built case per sweep to confirm the fact and action forms work, so that
+  "none reaches the goal" is a result and not a malformed script.
+- The surviving states, reduced to what they share, are the subgoal.  There 96,152 and 122,991
+  states took about two minutes; 60 survived, all one arrangement, and the put-down ending had
+  none.
+- Record what was not swept (longer endings, other placements) as limits.  A sweep shows which
+  states finish, not that any of them can be reached; the forward searches settle that.
 
 Step rules:
 - A step is one action, or a short sequence with no choice inside it, replayed whole
